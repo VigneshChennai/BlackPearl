@@ -6,11 +6,14 @@ import traceback
 import json
 import cgi
 
+from http.cookies import SimpleCookie
+
 from darkchoco.core import utils
 from darkchoco.core import sessions
 from darkchoco.core import exceptions
 from darkchoco.core import webapps
 from darkchoco.core import urls
+
 
 def __application__(environ, start_response):
     method = environ['REQUEST_METHOD']
@@ -32,35 +35,32 @@ def __application__(environ, start_response):
             status = '404 Requested URL not found'
             start_response(status, [])
             return [str(e).encode('utf-8')]   
-            
-        if webapp.session_enabled:
-            #session.__status__ attribute can have one among the below three 
-            #values
-            #
-            #session.__status__ = "fetched" --> When the session exist in 
-            #                                   session cache
-            #session.__status__ = "recreated" --> When the session does not 
-            #                                   exits in the session cache
-            #session.__status__ = "created" --> When the session id is not
-            #                                    in the cookie
-            try:
-                session_id = [utils.parseCookie(
-                                environ.get("HTTP_COOKIE","")
-                                )["session_id"]][0]
-                session = sessions.get_session(webapp, session_id)
-                session.__status__ = "fetched"
-                if session == None:
-                    session = sessions.Session(webapp)
-                    session.__status__ = "recreated"
-                    session_id = session.__id__
-                    
-            except:
-                session = sessions.Session(webapp)
-                session.__status__ = "created"
+        
+        #session.__status__ attribute can have one among the below three 
+        #values
+        #
+        #session.__status__ = "fetched" --> When the session is not expired
+        #session.__status__ = "recreated" --> When the session is expired
+        #session.__status__ = "created" --> When the session is not
+        #  
+        
+        cookie = SimpleCookie()
+        cookie.load(environ.get("HTTP_COOKIE",""))
+               
+        try:
+            cookie = SimpleCookie()
+            cookie.load(environ.get("HTTP_COOKIE",""))
+            session_b64_enc = cookie["session"].value
+            session = sessions.decode_session(session_b64_enc)
+            if session == None:
+                session = sessions.Session()
+                session.__status__ = "recreated"
                 session_id = session.__id__
-        else:
-            session = None
-            
+            else:
+                session.__status__ = "fetched"
+        except:
+            session = sessions.Session(webapp)
+            session.__status__ = "created"
         try:
             for preprocessor in webapp.preprocessors:
                 preprocessor(session, urlpath)
@@ -79,7 +79,7 @@ def __application__(environ, start_response):
             "status" : -2,
             "desc" : "Exception occured in Preprocessor. Error: <%s>" %(str(e))
             }
-            return [rets.encode('UTF-8')]
+            return [json.dumps(rets).encode('UTF-8')]
         
         rets = webapp.handle_request(session, urlpath, formvalues)         
         try:
@@ -93,7 +93,7 @@ def __application__(environ, start_response):
             "desc" : "Exception occured in posthandler <%s>."\
                 " Error: <%s>" %(str(posthandler), str(e))
             }
-            return [rets.encode('UTF-8')]
+            return [json.dumps(rets).encode('UTF-8')]
     except Exception as e:
         error = traceback.format_exc()
         status = '500 Internal Server Error Occured' 
@@ -102,17 +102,23 @@ def __application__(environ, start_response):
     
     status = "200 ok"
     json_rets = json.dumps(rets)
-    if webapp.session_enabled:
-        start_response(status,[('Set-Cookie', "session_id=%s" % (session_id))])
-    else:
-        start_response(status,[])
+    sess_value = sessions.encode_session(session).decode('utf-8') + "; Path=/"
+    if len(sess_value) > 4000:
+        start_response(status, [])
+        rets = {
+            "status" : -3,
+            "desc" : "Session object should be less than 4000 bytes in size."\
+                     "Currently the session object size is <%s> bytes" % (
+                                                                len(sess_value))
+            }
+        return [json.dumps(rets).encode('UTF-8')]
+    start_response(status,[('Set-Cookie', "session=%s" % (sess_value))])
         
     return [json_rets.encode('UTF-8')]
 
 def app_server(webappfolder):
      webapps_lst = webapps.get_app_details(webappfolder)
      urls.initialize(webapps_lst)
-     sessions.initialize(webapps_lst)
      return __application__
 
 application = app_server(os.environ['DARKCHOCO_APPS'])

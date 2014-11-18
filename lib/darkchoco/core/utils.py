@@ -45,7 +45,7 @@ def parseCookie(cookieString):
     cookies = {}
     for pair in cookieString.split('; '):
         values = pair.split('=')
-        cookies[values[0]] = values[1]
+        cookies[values[0]] = "=".join(values[1:])
     return cookies
 
 
