@@ -1,5 +1,5 @@
-from darkchoco.core.decorators import weblocation
-from darkchoco.core import datatype
+from BlackPearl.core.decorators import weblocation
+from BlackPearl.core import datatype
 
 @weblocation("/index")
 def hello():

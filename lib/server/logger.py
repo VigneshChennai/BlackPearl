@@ -17,8 +17,7 @@ class Logger:
         self.log_file = None
         self._orignal_print = builtins.print
         
-    def initialize(self, log_file):
-        self.log_file = log_file
+    def initialize(self):
         builtins.print = self._new_print
     
     def _can_print(self, msg):
@@ -51,7 +50,7 @@ class Logger:
             frm = inspect.currentframe()
             line.append("Module: %s" % frm.f_back.f_globals['__name__'])
             line.append("Line: %s ] " % frm.f_back.f_lineno)
-            kwargs['file'] = self.log_file
+            #kwargs['file'] = self.log_file
             self._orignal_print(' '.join(line), *args, **kwargs)
         else:
             self._orignal_print(*args, **kwargs)

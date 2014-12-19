@@ -8,15 +8,15 @@ import sys
 MIN_SUPPORTED_VERSION = (3,4,2)
 
 def check_env():
-    var_to_check = ['DARKCHOCO_HOME',
-                    'DARKCHOCO_SHARE',
-                    'DARKCHOCO_LIBS',
-                    'DARKCHOCO_APPS',
-                    'DARKCHOCO_TMP',
-                    'DARKCHOCO_CONFIG',
-                    'DARKCHOCO_DATA',
-                    'DARKCHOCO_LOGS',
-                    'DARKCHOCO_HOST_NAME',
+    var_to_check = ['BLACKPEARL_HOME',
+                    'BLACKPEARL_SHARE',
+                    'BLACKPEARL_LIBS',
+                    'BLACKPEARL_APPS',
+                    'BLACKPEARL_TMP',
+                    'BLACKPEARL_CONFIG',
+                    'BLACKPEARL_DATA',
+                    'BLACKPEARL_LOGS',
+                    'BLACKPEARL_HOST_NAME',
                     'APPBIND',
                     'WEBBIND',
                     'BLOCK_SIZE',
@@ -24,6 +24,7 @@ def check_env():
                     'PYTHON',
                     'NGINX',
                     'UWSGI',
+                    'ENV'
                     ]
     for var in var_to_check:
         try:

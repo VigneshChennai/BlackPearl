@@ -11,3 +11,11 @@ class NotImpletementYet(Exception):
 class NotStartedYet(Exception):
     def __init__(self, msg):
         super().__init__(msg)
+
+class NotRestartedYet(Exception):
+    def __init__(self, msg):
+        super().__init__(msg)
+        
+class InvalidState(Exception):
+    def __init__(self, msg):
+        super().__init__(msg)

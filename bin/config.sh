@@ -1,26 +1,30 @@
 #!/bin/bash
 
-export DARKCHOCO_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd ..&& pwd )"
+export BLACKPEARL_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd ..&& pwd )"
 
-export DARKCHOCO_SHARE=$DARKCHOCO_HOME/share
-export DARKCHOCO_LIBS=$DARKCHOCO_HOME/lib
-export DARKCHOCO_APPS="$DARKCHOCO_HOME/webapps"
-export DARKCHOCO_ADMIN_APPS="$DARKCHOCO_SHARE/AdminApps"
-export DARKCHOCO_TMP="/tmp/darkchoco-$USER"
-export DARKCHOCO_DATA="/tmp/darkchoco-$USER"
-export DARKCHOCO_CONFIG="/tmp/darkchoco-$USER"
+export BLACKPEARL_SHARE="$BLACKPEARL_HOME/share"
+export BLACKPEARL_LIBS="$BLACKPEARL_HOME/lib"
+export BLACKPEARL_APPS="$BLACKPEARL_HOME/webapps"
+export BLACKPEARL_ADMIN_APPS="$BLACKPEARL_SHARE/AdminApps"
+export BLACKPEARL_TMP="/tmp/BlackPearl-$USER"
+export BLACKPEARL_DATA="/tmp/BlackPearl-$USER"
+export BLACKPEARL_CONFIG="/tmp/BlackPearl-$USER"
 
-export DARKCHOCO_LOGS="$DARKCHOCO_TMP/logs-`date +%s`"
-export DARKCHOCO_HOST_NAME='localhost'
+#export BLACKPEARL_LOGS="$BLACKPEARL_TMP/logs-`date +%s`"
+export BLACKPEARL_LOGS="$BLACKPEARL_TMP/logs"
+export BLACKPEARL_HOST_NAME='localhost'
 
 export PYTHON="`which python`"
 export NGINX="nginx"
 export UWSGI="uwsgi"
 
 export WEBBIND="127.0.0.1:8080"
-export APPBIND="$DARKCHOCO_TMP/uwsgi.sock"
+export APPBIND="$BLACKPEARL_TMP/uwsgi.sock"
  
-export PYTHONPATH="$PYTHONPATH:$DARKCHOCO_LIBS"
+export PYTHONPATH="$PYTHONPATH:$BLACKPEARL_LIBS"
 
 export BLOCK_SIZE=16
 export SESS_AES_KEY="asdf2345sdfghhjk"
+
+#possible values, dev and prd
+export ENV="dev"
