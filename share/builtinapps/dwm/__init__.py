@@ -15,17 +15,6 @@
 #You should have received a copy of the GNU General Public License
 #along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
 
-class RequestInvalid(Exception):
-    """This exception should be raised by a
-    handler for an invalid request"""
-    pass
-
-class UnAuthorizedAccess(Exception):
-    """This exception should be raised by a
-    preprocessor when a request is unauthorized"""
-    pass
-
-class RequestCannotBeProcessed(Exception):
-    """This exception should be raised by a
-    preprocessor when a request can't be processed due to some reason"""
-    pass
+"""
+The DWM (Deployed Web Modules) application will exposess all the deployed web applications and it's JSON api's and,  provides an interface to invoke the api's and also execute the testcases as well if defined in the webapplication.
+"""

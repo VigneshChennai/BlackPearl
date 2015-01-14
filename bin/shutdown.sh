@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/bin/bash
 
 #This file is part of BlackPearl.
 
@@ -15,17 +15,6 @@
 #You should have received a copy of the GNU General Public License
 #along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
 
-class RequestInvalid(Exception):
-    """This exception should be raised by a
-    handler for an invalid request"""
-    pass
+CURDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-class UnAuthorizedAccess(Exception):
-    """This exception should be raised by a
-    preprocessor when a request is unauthorized"""
-    pass
-
-class RequestCannotBeProcessed(Exception):
-    """This exception should be raised by a
-    preprocessor when a request can't be processed due to some reason"""
-    pass
+"$CURDIR"/BlackPearl.sh shutdown

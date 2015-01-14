@@ -1,4 +1,19 @@
-#!/usr/bin/python
+#!/usr/bin/env python
+
+#This file is part of BlackPearl.
+
+#BlackPearl is free software: you can redistribute it and/or modify
+#it under the terms of the GNU General Public License as published by
+#the Free Software Foundation, either version 3 of the License, or
+#(at your option) any later version.
+
+#BlackPearl is distributed in the hope that it will be useful,
+#but WITHOUT ANY WARRANTY; without even the implied warranty of
+#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#GNU General Public License for more details.
+
+#You should have received a copy of the GNU General Public License
+#along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
 import inspect
@@ -20,9 +35,13 @@ def _validate_parameter(signature, parameter):
     1. Checks whether the number of arguments matched.
     2. Checks the data passed is same as of annotated datatype"""
     parameters = signature.parameters
-    p_list= []
-    for p in parameters.keys():
-        p_list.append(p)
+    p_list= [p for p in parameters.keys()]
+
+    try:
+        len(parameter)
+    except TypeError:
+        parameter = {}
+
     try:
         bound_arguments = signature.bind(**parameter)
     except:
@@ -30,12 +49,12 @@ def _validate_parameter(signature, parameter):
         raise Exception("The received parameters <" + str(arguments)
         +"> not matching with function definition <"
         + str(p_list) +">")
-        
+
     #This dict will hold the final list of validated arguments
     updated_args = {}
     for name, value in bound_arguments.arguments.items():
         annotation = parameters[name].annotation
-        
+
         #Recieved only a single value
         if not isinstance(value, list):
             if annotation is inspect.Signature.empty:
@@ -56,12 +75,12 @@ def _validate_parameter(signature, parameter):
                     updated_args[name] = datatype.parse(annotation, value)
                 except Exception as e:
                     print("WARNING: %s" % (traceback.format_exc()))
-                    raise Exception("Invalid data for parameter <" + name + "> : " 
+                    raise Exception("Invalid data for parameter <" + name + "> : "
                             + str(e) )
-                            
+
         #Recieved a list of values
         else:
-            #Even thought we received a list of values, the non annotated 
+            #Even thought we received a list of values, the non annotated
             #arguments will consider the first value only.
             if annotation is inspect.Signature.empty:
                 value = value[0]
@@ -81,22 +100,28 @@ def _validate_parameter(signature, parameter):
                 if isinstance(annotation, datatype.ListType):
                     parsed_value = []
                     updated_args[name] = parsed_value
-                    
+
                     #Validating all the received list of values
                     for v in value:
                         try:
                             parsed_value.append(datatype.parse(annotation, v))
                         except Exception as e:
                             print("WARNING: %s" % (traceback.format_exc()))
-                            raise Exception("Invalid data for parameter <" + name + "> : " 
+                            raise Exception("Invalid data for parameter <" + name + "> : "
                                     + str(e) )
-                                    
+
                 #Raising exception if it is not annotated as List type
                 else:
-                    raise Exception("Invalid data for parameter <" + name + "> : " 
+                    raise Exception("Invalid data for parameter <" + name + "> : "
                                 + "it don't support list of values" )
-                        
+
     return updated_args
 
-
+def fixurl(url):
+    url_seg = []
+    for segment in url.split('/'):
+        segment = segment.strip()
+        if len(segment) != 0:
+            url_seg.append(segment)
+    return "/" + "/".join(url_seg)
 

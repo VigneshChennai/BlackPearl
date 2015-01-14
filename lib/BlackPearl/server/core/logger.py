@@ -1,3 +1,19 @@
+#!/usr/bin/env python
+
+#This file is part of BlackPearl.
+
+#BlackPearl is free software: you can redistribute it and/or modify
+#it under the terms of the GNU General Public License as published by
+#the Free Software Foundation, either version 3 of the License, or
+#(at your option) any later version.
+
+#BlackPearl is distributed in the hope that it will be useful,
+#but WITHOUT ANY WARRANTY; without even the implied warranty of
+#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#GNU General Public License for more details.
+
+#You should have received a copy of the GNU General Public License
+#along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
 
 import builtins
 import inspect
@@ -11,19 +27,19 @@ class Logger:
     INFO=2
     ERROR=3
     SEVERE=4
-    
+
     def __init__(self, mode):
         self.mode = mode
         self.log_file = None
         self._orignal_print = builtins.print
-        
+
     def initialize(self):
         builtins.print = self._new_print
-    
+
     def _can_print(self, msg):
         if self.mode == Logger.NONE:
             return False
-            
+
         if msg.startswith("DEBUG:"):
             return Logger.DEBUG >= self.mode
         elif msg.startswith("INFO:"):
@@ -34,7 +50,7 @@ class Logger:
             return Logger.SEVERE >= self.mode
         else:
             return True
-            
+
     def _new_print(self, *args, **kwargs):
         args1 = [str(arg) for arg in args]
         if 'file' not in kwargs:

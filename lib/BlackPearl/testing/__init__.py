@@ -15,17 +15,4 @@
 #You should have received a copy of the GNU General Public License
 #along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
 
-class RequestInvalid(Exception):
-    """This exception should be raised by a
-    handler for an invalid request"""
-    pass
-
-class UnAuthorizedAccess(Exception):
-    """This exception should be raised by a
-    preprocessor when a request is unauthorized"""
-    pass
-
-class RequestCannotBeProcessed(Exception):
-    """This exception should be raised by a
-    preprocessor when a request can't be processed due to some reason"""
-    pass
+from .testing import *

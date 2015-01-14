@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>The Black Pearl - Deployed Web Modules</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="">
+  <meta name="author" content="">
+
+	<!--link rel="stylesheet/less" href="less/bootstrap.less" type="text/css" /-->
+	<!--link rel="stylesheet/less" href="less/responsive.less" type="text/css" /-->
+	<!--script src="js/less-1.3.3.min.js"></script-->
+	<!--append ‘#!watch’ to the browser URL, then refresh the page. -->
+
+	<link href="css/bootstrap.min.css" rel="stylesheet">
+	<link href="css/style.css" rel="stylesheet">
+
+  <!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
+  <!--[if lt IE 9]>
+    <script src="js/html5shiv.js"></script>
+  <![endif]-->
+
+  <!-- Fav and touch icons -->
+  <link rel="apple-touch-icon-precomposed" sizes="144x144" href="img/apple-touch-icon-144-precomposed.png">
+  <link rel="apple-touch-icon-precomposed" sizes="114x114" href="img/apple-touch-icon-114-precomposed.png">
+  <link rel="apple-touch-icon-precomposed" sizes="72x72" href="img/apple-touch-icon-72-precomposed.png">
+  <link rel="apple-touch-icon-precomposed" href="img/apple-touch-icon-57-precomposed.png">
+  <link rel="shortcut icon" href="img/favicon.png">
+
+
+	<script type="text/javascript" src="js/jquery.min.js"></script>
+	<script type="text/javascript" src="js/bootstrap.min.js"></script>
+	<script type="text/javascript" src="js/mustache.min.js"></script>
+	<script type="text/javascript" src="js/scripts.js"></script>
+
+	<script id="applications-desc-tmpl" type="x-tmpl-mustache">
+	    <!--<div class="alert alert-dismissable alert-success">
+	        <button type="button" class="close" data-dismiss="alert" aria-hidden="true">×</button>
+
+        </div>-->
+        {{{desc}}}
+    </script>
+
+	<script id="applications-list-tmpl" type="x-tmpl-mustache">
+	    {{#data}}
+	        <li class="application-list-item {{#active}}active{{/active}}">
+	            <a href="javascript:void(0)" onclick="openapp('{{id}}', this)">{{name}}</a>
+            </li>
+        {{/data}}
+    </script>
+    <script id="modules-list-tmpl" type="x-tmpl-mustache">
+        {{#data}}
+            <a href="javascript:void(0)"
+              class="overflow-ellipse list-group-item module-list-item {{#active}}active{{/active}}"
+              onclick="openmodule('{{location}}', this)">{{location}}</a>
+        {{/data}}
+    </script>
+
+    <script id="form-input-item-tmpl" type="x-tmpl-mustache">
+        <div class="form-group">
+            <label class="control-label fixed-col-md-4" for="{{arg}}_input_id">{{name}} :</label>
+            <div class="fixed-col-md-8">
+                {{#option_type}}
+
+                    <input id="{{arg}}_input_id" type="hidden" name="{{arg}}" />
+                    <div class="btn-group">
+
+                        <button type="button" data-toggle="dropdown" class="btn btn-default dropdown-toggle">
+                          <span id="{{arg}}_input_id_view">Select a value</span> <span class="caret"></span>
+                        </button>
+                        <ul class="dropdown-menu">
+                            {{#placeholder}}
+                                <li><a href="javascript:void(0)" onclick="form_option_cb(this,'{{arg}}_input_id', '{{arg}}_input_id_view')">{{valueOf}}</a></li>
+                            {{/placeholder}}
+                        </ul>
+                    </div>
+
+
+                {{/option_type}}
+                {{^option_type}}
+                    <input id="{{arg}}_input_id" class="form-control" name="{{arg}}" type="{{htmltype}}" placeholder="{{placeholder}}" />
+                {{/option_type}}
+            </div>
+        </div>
+    </script>
+    <script id="output-tmpl" type="x-tmpl-mustache">
+        <pre style="min-height:200px">{{output}}</pre>
+    </script>
+    <script id="list-tmpl" type="x-tmpl-mustache">
+		<div class="list-group">
+		{{#data}}
+            <a href="javascript:void(0)"
+              class="overflow-ellipse list-group-item module-list-item">{{valueOf}}</a>
+        {{/data}}
+		</div>
+
+    </script>
+    <script id="testset-tmpl" type="x-tmpl-mustache">
+		<div class="col-md-4 column testset">
+			<div class="panel panel-default">
+			    <div class="panel-heading">
+			         <a class="panel-title">{{name}}</a>
+			         <button class="testset_btn pull-right btn btn-primary" onclick="execute_testset('{{name}}')">Execute</button>
+			    </div>
+			    <div class="panel-body">
+			  		  {{desc}}
+			  		  {{^desc}}
+			            No description available
+			  		  {{/desc}}
+			    </div>
+			</div>
+		</div>
+	</script>
+</head>
+
+<body onload='load()'>
+    <nav class="navbar navbar-default navbar-inverse" role="navigation">
+	    <div class="navbar-header">
+            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar-collapse-1">
+		        <span class="sr-only">Toggle navigation</span>
+		        <span class="icon-bar"></span>
+		        <span class="icon-bar"></span>
+		        <span class="icon-bar"></span>
+	        </button>
+	        <a class="navbar-brand" href="/dwm">The Black Pearl</a>
+	    </div>
+
+	    <div class="collapse navbar-collapse" id="navbar-collapse-1">
+		    <ul id="topmenu-apps" class="nav navbar-nav">
+		    </ul>
+	    </div>
+    </nav>
+    <div class="container" style="width:100%;" >
+        <!--<div class="row clearfix" style="margin-top:70px;">
+        </div>-->
+
+        <div class="row clearfix" id="notification_area">
+            <div class="col-md-12 column">
+            </div>
+        </div>
+        <div class="panel-group bottom10" id="collapse-group">
+            <div class="panel panel-default bottom20">
+                <div class="panel-heading" data-toggle="collapse" style="cursor: pointer;"  href="#application-details-panel">
+                    <a class="panel-title">Application Details</a>
+                    <div class="pull-right reduce-half">
+      					<a href="javascript:void(0)" id="handlers-link" class="reduce-9">Handlers (<span id="handlers-count"></span>)</a> |
+                        <a href="javascript:void(0)" id="preprocessor-link"  class="reduce-9">Preprocessors (<span id="preprocessors-count"></span>)</a> |
+                        <a href="javascript:void(0)" id="posthandlers-link"  class="reduce-9">Posthandlers (<span id="posthandlers-count"></span>)</a>
+                  		<script>
+                  		  $("#handlers-link").click(function (e) {
+          						display_handlers();
+                  				e.stopPropagation();
+                  				e.preventDefault();
+                  		  });
+                  		  $("#preprocessor-link").click(function (e) {
+                  				display_preprocessors();
+                  				e.stopPropagation();
+                  				e.preventDefault();
+                  		  });
+                  		  $("#posthandlers-link").click(function (e) {
+                  				display_posthandlers();
+                  				e.stopPropagation();
+                  				e.preventDefault();
+                  		  });
+                  		</script>
+                    </div>
+                </div>
+                <div id="application-details-panel" class="panel-collapse in">
+                    <div class="panel-body">
+                        <div id="description-app" class="col-md-12 column top10 bottom10">
+                            <script type="text/javascript">
+                            <!--
+                                document.write(strings.app_desc_missing);
+                            //-->
+                            </script>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            <div class="panel panel-default" >
+                <div class="panel-heading" data-toggle="collapse" style="cursor: pointer;"  href="#modules-panel">
+                    <a class="panel-title">Modules</a>
+                </div>
+                <div class="panel-body panel-collapse in" id="modules-panel">
+                    <div class="row clearfix">
+                        <div class="col-lg-3 column bottom20" >
+                            <div class="paraheading">Deployed modules (<span id="modules-count"></span>)</div>
+                            <div id='modules-list' class="padding-top15 list-group">
+
+                            </div>
+                        </div>
+
+                        <div class="col-lg-9 column bottom20" >
+                            <div class="bottom20">
+                                <div class="tabbable" id="tabs-529884">
+                                    <ul class="nav nav-tabs">
+                                        <li class="active">
+                                            <a href="#panel-498084" onclick="$('#output-container').show()" data-toggle="tab">Invoke</a>
+                                        </li>
+                                        <li>
+                                            <a href="#panel-498207" onclick="$('#output-container').hide()" data-toggle="tab">Description</a>
+                                        </li>
+                                        <li>
+                                            <a href="#panel-498205" onclick="$('#output-container').show()" data-toggle="tab">Test Sets</a>
+                                        </li>
+                                    </ul>
+                                    <div class="tab-content">
+                                        <div class="tab-pane active" id="panel-498084">
+                                            <div class="panel  panel-default no-border-top">
+                                                <div class="panel-body nopadding no-border-top">
+                                                    <form class="form-horizontal" role="form" id="invoke-form" enctype="multipart/form-data">
+                                                        <table class="fullsize">
+                                                            <tr>
+                                                                <td class="fixed-col-md-9 "  valign="top" align="left">
+                                                                    <div class="padding30 ">
+                                                                        <h4>Required Inputs</h4><br/>
+                                                                        <div id='invoke-form-inputs'>
+                                                                            <p class="help-block">
+                                                                                The module accepts no inputs.
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                                <td  class="fixed-col-md-3">
+                                                                    <table class="fullsize">
+                                                                        <tr>
+                                                                            <td class="fullsize" valign="centre" align="center">
+                                                                                <button type="button" class="btn btn-primary invoke_btn" onclick="invoke()">Invoke</button>
+                                                                            </td>
+                                                                        </tr>
+                                                                    </table>
+                                                                </td>
+                                                            </tr>
+                                                        </table>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="tab-pane" id="panel-498205">
+                                            <div class="row clearfix">
+                                                <div class="col-md-12 column">
+                                                    <div class="panel panel-default no-border-top">
+                                                        <div id="testsets-container" class="panel-body no-border-top">
+                                                            <div class="col-md-4 column" style="visibility: hidden">
+                                                                <div class="progress">
+                                                                    <div class="progress-bar progress-success">
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                      <div class="tab-pane" id="panel-498207">
+                                            <div class="row clearfix">
+                                                <div class="col-md-12 column">
+                                                    <div class="panel panel-default no-border-top">
+                                                        <div class="panel-body no-border-top" id="description-module">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+	                        <div id="output-container" class="row clearfix">
+		                        <div class="col-md-12 column">
+		                            <div id="output-panel" class="panel panel-default">
+		                                <div class="panel-heading">
+		                                     <a class="panel-title">Output</a>
+		                                </div>
+		                                <div id="output-box" class="panel-body">
+		                                    <pre id="output-id">
+
+
+
+
+
+
+
+
+		                                    </pre>
+		                                </div>
+		                            </div>
+		                        </div>
+		                    </div>
+                        </div>
+                    </div>
+
+                    <a style="display:none" id="ModalMsg" href="#modal-container-msg" role="button" class="btn" data-toggle="modal">Launch Message</a>
+                    <div class="modal fade" id="modal-container-msg" role="dialog" aria-labelledby="ModalMsg-title" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div id="modal-type" class="modal-content panel-info">
+                                <div class="modal-header panel-heading">
+                                     <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+                                    <h4 class="modal-title" id="ModalMsg-title">
+                                        Modal title
+                                    </h4>
+                                </div>
+                                <div class="modal-body" id="ModalMsg-body">
+                                    ...
+                                </div>
+                                <div class="modal-footer">
+                                 <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+
+    </script>
+</body>
+</html>

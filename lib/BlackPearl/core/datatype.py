@@ -1,4 +1,19 @@
-#!/usr/bin/python
+#!/usr/bin/env python
+
+#This file is part of BlackPearl.
+
+#BlackPearl is free software: you can redistribute it and/or modify
+#it under the terms of the GNU General Public License as published by
+#the Free Software Foundation, either version 3 of the License, or
+#(at your option) any later version.
+
+#BlackPearl is distributed in the hope that it will be useful,
+#but WITHOUT ANY WARRANTY; without even the implied warranty of
+#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#GNU General Public License for more details.
+
+#You should have received a copy of the GNU General Public License
+#along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
 
 import re
 
@@ -7,7 +22,7 @@ def isvalid(dataType, data):
     try:
         return dataType.__is_valid__(data)
     except AttributeError as ae:
-        raise Exception("DataType <"+ str(dataType.__class__.__name__) 
+        raise Exception("DataType <"+ str(dataType.__class__.__name__)
             + "> is a invalid to be used in web "
             + "method annotations.\nActual error: " + str(ae))
 
@@ -31,7 +46,7 @@ class Type:
 #All the list datatype should be a subclass of this class
 class ListType(Type):
     pass
-    
+
 
 class File(Type):
     def __is_valid__(self, data):
@@ -47,7 +62,7 @@ class File(Type):
                 }
     def __repr__(self):
         return "File datatype"
-        
+
     def __str__(self):
         return "It accepts only file inputs."
 
@@ -64,17 +79,17 @@ class Float(Type):
             return False
     def __parse__(self, data):
         return float(data.value)
-    
+
     def __repr__(self):
         return "Float datatype"
     def __str__(self):
         return "It accepts floating point number. Example : 234.123"
-    
-        
+
+
 class FloatList(ListType, Float):
     def __repr__(self):
         return "Float List datatype"
-    
+
 class Integer(Type):
     def __is_valid__(self, data):
         try:
@@ -93,13 +108,13 @@ class IntegerList(ListType, Integer):
 
     def __repr__(self):
         return "Integer List datatype"
-    
+
 class Format(Type):
     """Custom regex based format"""
     def __init__(self, data_format):
         self.data_format = data_format
         self.pattern = re.compile(data_format)
-        
+
     def __is_valid__(self, data):
         try:
             if self.pattern.match(data.value):
@@ -111,21 +126,21 @@ class Format(Type):
 
     def __parse__(self, data):
         return data.value
-        
+
     def __repr__(self):
         return "Regex datatype"
-    
+
     def __str__(self):
         return "It is defined to accept only value of " \
                        "format <%s> as value" % (str(self.pattern))
-                       
+
 class FormatList(ListType, Format):
     def __init__(self, data_format):
         Format.__init__(self, data_format)
 
     def __repr__(self):
         return "Regex List datatype"
-        
+
 class Options(Type):
     def __init__(self, *values):
         v = []
@@ -145,14 +160,14 @@ class Options(Type):
 
     def __repr__(self):
         return "Option datatype"
-        
+
     def __str__(self):
         return "It is defined to accept only one of the <%s> as value" % (str(self.values))
 
 class OptionsList(ListType, Options):
     def __init__(self, *values):
         Options.__init__(self, values)
-        
+
     def __repr__(self):
         return "Option List datatype"
 
