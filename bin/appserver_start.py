@@ -20,4 +20,13 @@ import sys
 
 from BlackPearl.server import appserver
 
-appserver.start(sys.argv)
+def usage():
+    print("Usage:\n")
+    print("appserver_start.py [-d or --daemon]")
+
+if len(sys.argv) == 1:
+    appserver.start(daemon=False)
+elif len(sys.argv) == 2 and sys.argv[1] in ("--daemon", "-d"):
+    appserver.start(daemon=True)
+else:
+    print("Invalid arguments passes. <%s>" % sys.argv)

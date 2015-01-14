@@ -362,14 +362,14 @@ class AppServer():
 
             return True
 
-def start(argv):
+def start(daemon=False):
     print("Performing precheck .... ", end="")
     if not precheck():
         print("[Failed]\nNode not started ....")
         sys.exit(-1)
     else:
         print("[Ok]")
-        if len(argv) == 2 and argv[1] in ("--daemon", "-d"):
+        if daemon:
             try:
                 f = os.fork()
             except OSError as e:
