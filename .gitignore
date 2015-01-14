@@ -2,4 +2,5 @@ __pycache__
 *.pyc
 *~
 /python
-
+/webapps/webapp1
+/webapps/webapp2
