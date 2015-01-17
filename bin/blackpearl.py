@@ -25,6 +25,34 @@ import signal
 
 from BlackPearl.server import appserver, config
 
+startupnotes = """
+    BlackPearl is free software. License GPLv3+: GNU GPL version 3 or later
+    <http://gnu.org/licenses/gpl.html>
+
+    "Free software" means software that respects users' freedom and community.
+    Roughly, it means that the users have the freedom to run, copy, distribute,
+    study, change and improve the software. Thus, "free software" is a matter
+    of liberty, not price. To understand the concept, you should think of
+    "free" as in "free speech," not as in "free beer".
+    For details, visit https://www.gnu.org/philosophy/free-sw.html
+"""
+
+author = """
+    Written by Vigneshwaran P (https://github.com/VigneshChennai)
+"""
+
+class color:
+    PURPLE = '\033[95m'
+    CYAN = '\033[96m'
+    DARKCYAN = '\033[36m'
+    BLUE = '\033[94m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+    END = '\033[0m'
+
 def usage():
     print("""**Usage**
 
@@ -35,19 +63,18 @@ Options:
     2. shutdown""")
 
 def startserver(daemon):
-    pypath = [config.lib,
-              config.webapps,
-              config.adminapps,
-              config.defaultapps]
-    os.environ["PYTHONPATH"] = ":".join(pypath)
-    sys.path.extend(pypath)
+    print(color.BOLD + '\nBlackPearl' + color.END)
+    print(startupnotes)
+    print(color.BOLD + 'Author' + color.END)
+    print(author)
+
     if os.access(config.temp, os.F_OK):
         try:
             with open(os.path.join(config.temp, "BlackPearl.pid")) as f:
                 pid = f.read()
             os.kill(int(pid), 0)
             print("BlackPearl is currently running. "\
-                  "Shutdown it before starting it up again.")
+                  "Shutdown it before starting it up again.\n")
             return
         except:
             pass
@@ -64,7 +91,7 @@ def startserver(daemon):
 
 
 def stopserver():
-    print("\nStopping BlackPearl services in localhost"\
+    print("Stopping BlackPearl services in localhost"\
          "running on <%s> user account" % pwd.getpwuid(os.getuid())[0])
     if os.access(config.temp, os.F_OK):
         print("Trying to stop BlackPearl service ...", end="")
