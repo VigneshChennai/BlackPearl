@@ -29,6 +29,8 @@ from BlackPearl.core import utils
 from BlackPearl.core import sessions
 from BlackPearl.core import exceptions
 from BlackPearl.core import webapps
+from BlackPearl.core import security
+from BlackPearl.testing import testing
 
 modules = {}
 deployed_webapps = []
@@ -176,7 +178,11 @@ def initialize():
     global modules, deployed_webapps
     #initializing the webapps from the pickled file.
     print("Initializing webapps")
-    pfile = open(os.environ["BLACKPEARL_TMP"]+"/webapps_init", "rb")
+    temp = os.environ["BLACKPEARL_TMP"]
+    security.BLOCK_SIZE = int(os.environ['BLACKPEARL_ENCRYPT_BLOCK_SIZE'])
+    security.AES_KEY = os.environ['BLACKPEARL_ENCRYPT_KEY']
+    testing.listen = os.environ['BLACKPEARL_LISTEN']
+    pfile = open("%s/pickle/webapps" % temp, "rb")
     with pfile:
         deployed_webapps = pickle.load(pfile)
 
@@ -186,6 +192,7 @@ def initialize():
         for url, webmodule in webapp.webmodules.items():
             modules[url] = webapp
             webmodule["signature"] = inspect.signature(webmodule["handler"])
+
 
 #This "application" is called for every request by the appserver (uwsgi)
 application = __application__

@@ -27,11 +27,12 @@ from http.cookiejar import CookieJar
 import urllib.request
 import urllib.parse
 
+
 __all__ = ['testset', 'testcase', 'test', 'TestcaseFailed',
             'InvalidTestcaseInvoke',  'ErrorInvokingWebModule',
             'TestcaseFailed', 'TestcaseError']
 
-WEBBIND = os.environ['WEBBIND']
+listen = "localhost:8080"
 
 class TestsetInvoker:
 
@@ -181,7 +182,7 @@ def _invoke_webmodule(opener, url, input):
     #invoking the webmodule.
     #TODO: https protocol need to be supported.
     #TODO: Support file and post form submit method.
-    response = opener.open("http://" + WEBBIND + url + "?" + strValues)
+    response = opener.open("http://" + listen + url + "?" + strValues)
     return response.read()
 
 def testprint(*args, **kwargs):

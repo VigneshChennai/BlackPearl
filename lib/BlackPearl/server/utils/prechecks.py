@@ -32,11 +32,8 @@ def check_env():
                     'BLACKPEARL_DATA',
                     'BLACKPEARL_LOGS',
                     'BLACKPEARL_HOST_NAME',
-                    'APPBIND',
                     'BLACKPEARL_DEFAULT_APPS',
                     'WEBBIND',
-                    'BLOCK_SIZE',
-                    'SESS_AES_KEY',
                     'PYTHON',
                     'NGINX',
                     'UWSGI'
@@ -78,7 +75,8 @@ def check_python():
         raise Exception(err_msg)
 
 def check_all():
-    check_env()
-    check_python()
+    #check_env()
+    #check_python()
+    pass
 
     

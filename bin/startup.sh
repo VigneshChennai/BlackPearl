@@ -17,4 +17,6 @@
 
 CURDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-"$CURDIR"/BlackPearl.sh startup
+export PYTHONPATH=$CURDIR/../lib
+
+"$CURDIR"/blackpearl.py startup

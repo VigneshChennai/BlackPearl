@@ -34,12 +34,13 @@ def delete_process(process):
 
 class Process:
 
-    def __init__(self, name, command, sig_timeout=15):
+    def __init__(self, name, command, sig_timeout=15, env={}):
         self.name = name
         self.command = command
         self.pid = None
         self.status = "NOTSTARTED"
         self.sig_timeout = sig_timeout
+        self.env = env
 
     def _set_status(self, status):
         self.status = status
@@ -59,7 +60,7 @@ class Process:
             process = yield from asyncio.create_subprocess_exec(*self.command,
                                        stdin = inull,
                                        stdout = sys.stdout,
-                                       stderr = sys.stderr)
+                                       stderr = sys.stderr, env=self.env)
             self.pid = process.pid
             self._set_status("STARTED")
             s = yield from process.wait()

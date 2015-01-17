@@ -1,4 +1,4 @@
-#!/bin/env python
+#!/usr/bin/env python
 
 #This file is part of BlackPearl.
 
@@ -15,18 +15,26 @@
 #You should have received a copy of the GNU General Public License
 #along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
 
+import base64
+import os
 
-import sys
+from Crypto.Cipher import AES
 
-from BlackPearl.server import appserver
+BLOCK_SIZE=None
+AES_KEY=None
 
-def usage():
-    print("Usage:\n")
-    print("appserver_start.py [-d or --daemon]")
+PADDING = b"{"
 
-if len(sys.argv) == 1:
-    appserver.start(daemon=False)
-elif len(sys.argv) == 2 and sys.argv[1] in ("--daemon", "-d"):
-    appserver.start(daemon=True)
-else:
-    print("Invalid arguments passes. <%s>" % sys.argv)
+def encrypt(privateInfo):
+    pad = lambda s: s + (BLOCK_SIZE - len(s) % BLOCK_SIZE) * PADDING
+    # encrypt with AES, encode with base64
+    EncodeAES = lambda c, s: base64.b64encode(c.encrypt(pad(s)))
+    cipher = AES.new(AES_KEY)
+    encoded = EncodeAES(cipher, privateInfo)
+    return encoded
+
+def decrypt(encryptedString):
+    DecodeAES = lambda c, e: c.decrypt(base64.b64decode(e)).rstrip(PADDING)
+    cipher = AES.new(AES_KEY)
+    decoded = DecodeAES(cipher, encryptedString)
+    return decoded
