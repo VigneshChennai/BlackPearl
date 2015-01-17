@@ -238,15 +238,31 @@ class Webapp:
         isfunction = inspect.isfunction
         isclass = inspect.isclass
 
+        def checkurl(url, name, member):
+            if url in self.webmodules:
+                print("WARNING: Url<%s> is already defined. "\
+                      "Ignoring webmodule<%s> defined in <%s>" %(
+                          url, name,
+                          inspect.getmodule(member).__file__))
+                return False
+            return True
+
         for name, member in inspect.getmembers(module):
             if isfunction(member):
                 if hasattr(member, "_webmodule"):
                     if len(self.url_prefix) == 0:
                         url = utils.fixurl(member._webmodule['url'])
-                        self.webmodules[url] = member._webmodule
+                        if url in self.webmodules:
+                            print("WARNING: Url<%s> is already defined. "\
+                                  "Ignoring webmodule<%s> defined in <%s>" %(
+                                      url, name,
+                                      inspect.getmodule(member).__file__))
+                        if checkurl(url, name, member):
+                            self.webmodules[url] = member._webmodule
                     else:
                         url = "/" + self.url_prefix + utils.fixurl(member._webmodule['url'])
-                        self.webmodules[url] = member._webmodule
+                        if checkurl(url, name, member):
+                            self.webmodules[url] = member._webmodule
                 elif hasattr(member, "_preprocessor"):
                     if member._preprocessor['name'] in self.defined_preprocessors:
                         self.preprocessors.append(member._preprocessor)
@@ -269,10 +285,12 @@ class Webapp:
                 for webmodule in member._webmodules:
                     if len(self.url_prefix) == 0:
                         url = utils.fixurl(webmodule['url'])
-                        self.webmodules[url] = webmodule
+                        if checkurl(url, name, member):
+                            self.webmodules[url] = webmodule
                     else:
                         url = "/" + self.url_prefix + utils.fixurl(webmodule['url'])
-                        self.webmodules[url] = webmodule
+                        if checkurl(url, name, member):
+                            self.webmodules[url] = webmodule
 
 
 def initialize(location):

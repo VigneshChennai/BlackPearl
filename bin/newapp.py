@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/env python
 
 #This file is part of BlackPearl.
 
@@ -15,53 +15,33 @@
 #You should have received a copy of the GNU General Public License
 #along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
 
-usage() {
-    echo
-    echo "***Comman usage*** : newapp.sh"
-    echo ""
-    echo "    newapp.sh <appname>"
-    echo ""
-    echo "Example :"
-    echo "    newapp.sh mynewapp"
-    echo ""
-}
+import os
+import sys
 
-if [ "$1"x == x ]
-then
-    usage
-    exit 1
-fi
+def usage():
+    print("""
+Usage : newapp
 
+    newapp <appname>
 
-APPNAME="$1"
-echo -n "Application Full Name : "
-read APPFULLNAME
-echo -n "Author Name : "
-read AUTHNAME
-echo -n "Website : "
-read WEBSITE
-echo -n "Email Address : "
-read EMAILID
+Example :
+    newapp mynewapp
+""")
 
-mkdir "$APPNAME"
-
-cd "$APPNAME"
-
-cat > config.py <<EOF
-#!/bin/env python
+config_file = """#!/bin/env python
 
 ################################################################################
 #                  BlackPearl Application configuration file
 #
-# Application Name : $APPFULLNAME
-# Author :  $AUTHNAME
-# Website : $WEBSITE
-# Email Address : $EMAILID
+fullname = "{fullappname}"
+author = "{author}"
+website = "{website}"
+email = "{emailid}"
 #
 ################################################################################
 
 
-name= "$APPFULLNAME"
+name= "{appname}"
 
 #URL Prefix for the webapplication.
 #
@@ -78,7 +58,7 @@ name= "$APPFULLNAME"
 # then the application will be deployed at "www.example.com"
 #
 
-url_prefix="$APPNAME"
+url_prefix="{appname}"
 
 #Handlers are the list of python files which holds the python web modules.
 #
@@ -89,37 +69,41 @@ url_prefix="$APPNAME"
 #then
 #handlers = ['Webapp.hander']
 
-handlers = ["$APPNAME.handlers"]
+handlers = ["{appname}.handlers"]
 
 #If sessions are not used in the application, the below should be set to False
 session_enabled = True
 
 
 #List of python function which need to process the incoming request before
-#handing it to the webmodules
+#handing it to the webmodules.
+#Note: The list defined here are for specifying the order of execution only.
+#      The preprocessors must be decorate with @preprocessor decorator
 #
 #This is not the python files, it should the list of fulle python function name
 #
 #Example : if python function "preprocessor" listed under Webapp/hander.py file
 #then
-#posthanlder = ['Webapp.hander.preprocessor'}
+#preprocessor = ['Webapp.hander.preprocessor']
 
 preprocessors = []
 
 #List of python function which need to process the outgoing request after
 #the webmodules processed the request.
+#Note: The list defined here are for specifying the order of execution only.
+#      The posthandler must be decorate with @posthandler decorator
 #
 #This is not the python files, it should the list of full python function name
 #
 #Example : if python function "posthandler" listed under Webapp/hander.py file
 #then
-#posthanlder = ['Webapp.hander.posthandler'}
+#posthandler = ['Webapp.hander.posthandler']
 
 posthandlers = []
 
-EOF
+"""
 
-cat > handlers.py <<EOF
+handlers_file = """
 #!/bin/env python
 
 from BlackPearl.core.decorators import weblocation
@@ -131,5 +115,35 @@ def hello():
             "desc" : "My first helloworld BlackPearl web application"
     }
     return ret
+"""
 
-EOF
+def main():
+
+    if len(sys.argv) != 2:
+        usage()
+        sys.exit(1)
+
+    if not os.access(".", os.W_OK):
+        print("ERROR: Unable to create folder on the current working directory")
+        sys.exit(1)
+
+    appname = sys.argv[1]
+    fullappname = input("Application Full Name : ")
+    author = input("Author Name : ")
+    website = input("Website : ")
+    emailid = input("Email Address : ")
+
+    os.mkdir(appname)
+    with open(os.path.join(appname, 'config.py'), "w") as f:
+        f.write(config_file.format(appname=appname,
+                   fullappname=fullappname,
+                   author=author,
+                   website=website,
+                   emailid=emailid)
+               )
+
+    with open(os.path.join(appname, 'handlers.py'), "w") as f:
+        f.write(handlers_file)
+
+if __name__ == "__main__":
+    main()

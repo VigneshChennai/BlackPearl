@@ -36,6 +36,11 @@ from BlackPearl.server import config
 from BlackPearl.core import webapps as Webapps
 
 
+class WebAppMinimal:
+    def __init__(self, location, url_prefix):
+        self.location = location
+        self.url_prefix = url_prefix
+
 def analyse_and_pickle_webapps(picklefile, *appdirs):
 
     def analyser(queue):
@@ -49,8 +54,11 @@ def analyse_and_pickle_webapps(picklefile, *appdirs):
             with open(picklefile, "wb") as pfile:
                 pickle.dump(webapps, pfile)
             print("INFO: Write completed")
-
-            queue.put(webapps)
+            _webapps = []
+            for webapp in webapps:
+                _webapps.append(
+                    WebAppMinimal(webapp.location, webapp.url_prefix))
+            queue.put(_webapps)
         except:
             print("ERROR: Fatal error during analysing webapps.")
             print("ERROR: %s" %traceback.format_exc())
@@ -222,6 +230,8 @@ class Nginx(Process):
 
         with open("%s/nginx.conf" % (self.temp_loc), "w") as f:
             f.write(conf)
+
+
 
 class AppServer():
 
