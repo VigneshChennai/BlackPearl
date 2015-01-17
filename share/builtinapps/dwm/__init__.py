@@ -13,7 +13,7 @@
 #GNU General Public License for more details.
 
 #You should have received a copy of the GNU General Public License
-#along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+#along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 The DWM (Deployed Web Modules) application will exposess all the deployed web applications and it's JSON api's and,  provides an interface to invoke the api's and also execute the testcases as well if defined in the webapplication.
