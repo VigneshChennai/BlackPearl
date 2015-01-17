@@ -251,6 +251,55 @@ class AppServer():
                            options['logs'])
         self.nginx.generate_conf_file(webapps)
         self.status = "NOTSTARTED"
+        self.reload_code_called = False
+        self.afm = None
+        self._init_codeupdate_monitor()
+
+    def _reload_code(self):
+        global afm
+        try:
+            running = self.isrunning()
+        except NotStartedYet:
+            pass
+        except NotRestartedYet:
+            pass
+        else:
+            if running:
+                webapps = analyse_and_pickle_webapps(
+                                        "%s/pickle/webapps" % config.temp,
+                                         config.defaultapps,
+                                         config.webapps
+                                        )
+                self._init_codeupdate_monitor()
+                if webapps == None:
+                    print("WARNING: Old code retained."\
+                          " Modified code not redeployed.")
+                else:
+                    self.code_updated(webapps)
+        self.reload_code_called = False
+
+
+    def _filemodified_callback(self, event):
+        if os.path.isdir(event.pathname) or event.pathname.endswith(".py"):
+            print("INFO: File<%s> modified." % (event.pathname))
+            if not self.reload_code_called:
+                self.reload_code_called = True
+                evloop = asyncio.get_event_loop()
+                evloop.call_later(1, self._reload_code)
+
+    def _init_codeupdate_monitor(self):
+        paths = [
+                config.defaultapps,
+                config.webapps
+                ]
+        excl = pyinotify.ExcludeFilter([
+                config.defaultapps + "/*/static",
+                config.webapps + "/*/static"
+                ])
+        if self.afm:
+            self.afm.stop()
+        self.afm = fileutils.AsyncFileMonitor(self._filemodified_callback)
+        self.afm.add_watch_path(paths, rec=True, exclude_filter=excl)
 
     def _start_uwsgi_cb(self, future):
         try:
@@ -430,14 +479,6 @@ def start(daemon=False):
             print("SEVERE: No application deployed.")
             sys.exit(1)
 
-        paths = [
-                config.defaultapps,
-                config.webapps
-                ]
-        excl = pyinotify.ExcludeFilter([
-                config.defaultapps + "/*/static",
-                config.webapps + "/*/static"
-                ])
 
         evloop = asyncio.get_event_loop()
 
@@ -448,40 +489,6 @@ def start(daemon=False):
         appserver = AppServer(options, webapps)
 
         evloop.call_soon(appserver.start)
-
-        def reload_code():
-            try:
-                running = appserver.isrunning()
-            except NotStartedYet:
-                pass
-            except NotRestartedYet:
-                pass
-            else:
-                if running:
-                    webapps = analyse_and_pickle_webapps(
-                                            "%s/pickle/webapps" % config.temp,
-                                             config.defaultapps,
-                                             config.webapps
-                                            )
-                    if webapps == None:
-                        print("WARNING: Old code retained."\
-                              " Modified code not redeployed.")
-                    else:
-                        appserver.code_updated(webapps)
-            reload_code.called = False
-
-        reload_code.called = False
-
-        def filemodified_callback(event):
-            if event.pathname.endswith(".py"):
-                print("INFO: File<%s> modified." % (event.pathname))
-                if not reload_code.called:
-                    reload_code.called = True
-                    evloop.call_later(1, reload_code)
-
-        afm = fileutils.AsyncFileMonitor(filemodified_callback)
-        afm.add_watch_path(paths, rec=True, exclude_filter=excl)
-
 
         def signal_handler(signum):
             print('Receive signal : ', signum)
