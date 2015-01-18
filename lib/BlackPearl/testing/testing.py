@@ -166,24 +166,11 @@ def _invoke_webmodule(opener, url, input):
     #param to the webmodule
     quote = urllib.parse.quote
 
-    #preparing values in a proper way
-    values = []
-    for key, value in input.items():
-        key = quote(key, safe="")
-        value = quote(value, safe="")
-        values.append(key + "=" + value)
-
-    #joining all the values
-    if len(values) > 0:
-        strValues = "&".join(values)
-    else:
-        #for webmodules which accepts no input
-        strValues = ''
-
     #invoking the webmodule.
     #TODO: https protocol need to be supported.
     #TODO: Support file and post form submit method.
-    response = opener.open("http://" + listen + url + "?" + strValues)
+    response = opener.open("http://" + listen + url,
+                           urllib.parse.urlencode(input).encode('UTF-8'))
     return response.read()
 
 def testprint(*args, **kwargs):
