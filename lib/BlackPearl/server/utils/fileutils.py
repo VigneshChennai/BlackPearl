@@ -26,13 +26,28 @@ class AsyncFileMonitor(pyinotify.Notifier):
         pyinotify.Notifier.__init__(self, self._wm, default_proc_fun, read_freq,
                           threshold, timeout)
         if not loop:
-            loop = asyncio.get_event_loop()
-        loop.add_reader(self._fd, self._events_ready)
+            self.loop = asyncio.get_event_loop()
+        self.loop.add_reader(self._fd, self._events_ready)
+        self.wdd = None
 
-    def add_watch_path(self, path, rec=False, exclude_filter=pyinotify.ExcludeFilter([])):
-        wdd = self._wm.add_watch(path, pyinotify.IN_DELETE | pyinotify.IN_CREATE | pyinotify.IN_CLOSE_WRITE, rec=rec,
+    def set_watch_path(self, path, rec=False, exclude_filter=pyinotify.ExcludeFilter([])):
+        if not self.wdd:
+            self.path = path
+            self.exclude_filter = exclude_filter
+            self.wdd = self._wm.add_watch(path, pyinotify.IN_DELETE | pyinotify.IN_CREATE | pyinotify.IN_CLOSE_WRITE, rec=rec,
                             exclude_filter=exclude_filter)
+
+    def update_watch_path(self, rec=False):
+        if self.wdd:
+            self._wm.rm_watch(self.wdd.values(), rec=True)
+            self.wdd = self._wm.add_watch(self.path, pyinotify.IN_DELETE | pyinotify.IN_CREATE | pyinotify.IN_CLOSE_WRITE, rec=rec,
+                            exclude_filter=self.exclude_filter)
 
     def _events_ready(self):
         self.read_events()
         self.process_events()
+
+
+    def stop(self):
+        self.loop.remove_reader(self._fd)
+        pyinotify.Notifier.stop(self)

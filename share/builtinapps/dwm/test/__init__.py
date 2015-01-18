@@ -17,33 +17,37 @@
 
 from BlackPearl.testing import testset, testcase, test
 
-@testset(name="Application API testing", webmodule="/applications")
-def smoketest():
-    result = testcase({})
-    test(result['status'], 0)
 
-@testset(name="Application API testin2g", webmodule="/applications")
-def smoketest1():
-    result = testcase({})
-    test(result['status'], 0)
-
-
-@testset(name="session_testing", webmodule="/trial")
-def session_testing():
-    print("Checking first iteration")
-    result = testcase({'s' : "older"})
-    test(result['data'], 'Old value : Not set yet')
-
-    print("Checking second iteration")
-    result = testcase({'s' : "older1"})
-    test(result['data'], 'Old value : older')
-
-    print("Checking Third iteration")
-    result = testcase({'s' : "older2"})
-    test(result['data'], 'Old value : older1')
+@testset(name="Session Max - Min value check",
+         webmodule="/testing/servertesting/sessiontest")
+def session_max_min_check():
+    for i in range(1,4001):
+        val = "x" * i
+        print("Checking with session size <%s>" % i)
+        result = testcase({"value": val})
+        try:
+            test(result['status'], 0)
+        except:
+            print("Working session size is <%s>" % (i-1))
+            return
 
     print("All testcase completed successfully")
 
+@testset(name="Session value check",
+         webmodule="/testing/servertesting/sessiontest")
+def session_value_check():
+    old_value = None
+    for i in range(1,4000):
+        val = "x" * i
+        print("Checking with session size <%s>" % i)
+        result = testcase({"value": val})
+        try:
+            test(result['data']['session'], old_value)
+        except:
+            print(result)
+            return
+        old_value = val
 
+    print("All testcase completed successfully")
 
 

@@ -270,7 +270,7 @@ class AppServer():
                                          config.defaultapps,
                                          config.webapps
                                         )
-                self._init_codeupdate_monitor()
+                self.afm.update_watch_path(rec=True)
                 if webapps == None:
                     print("WARNING: Old code retained."\
                           " Modified code not redeployed.")
@@ -296,10 +296,8 @@ class AppServer():
                 config.defaultapps + "/*/static",
                 config.webapps + "/*/static"
                 ])
-        if self.afm:
-            self.afm.stop()
         self.afm = fileutils.AsyncFileMonitor(self._filemodified_callback)
-        self.afm.add_watch_path(paths, rec=True, exclude_filter=excl)
+        self.afm.set_watch_path(paths, rec=True, exclude_filter=excl)
 
     def _start_uwsgi_cb(self, future):
         try:

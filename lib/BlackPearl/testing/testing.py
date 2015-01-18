@@ -80,9 +80,10 @@ class TestsetInvoker:
                 "status" : -2,
                 "result" : "Error",
                 "desc" : "Error occured in invoking the Testcase<%s>. "\
-                         "Error: (%s) at line <%s>" % (self.name, str(e),
-                                    traceback.extract_stack(limit=1)[0][1]),
-                 "prints" : testset_outs
+                         "Error: (%s) at line <%s>" % (self.name,
+                          type(e).__name__ + ": " + str(e) ,
+                          traceback.extract_tb(e.__traceback__)[-1][1]),
+                "prints" : testset_outs
             }
         else:
             testset_outs.append('[%s] %s' % (strftime("%Y-%m-%d %H:%M:%S"),

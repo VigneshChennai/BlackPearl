@@ -149,5 +149,23 @@ def run_testset(url, name):
         raise RequestInvalid("The name <%s> not found" % name)
     return ret
 
+@weblocation("/testing/servertesting")
+class Session:
+
+    @webname("sessiontest")
+    def testing(self, value):
+        try:
+            ret = {
+                    "session" : self.session.value
+            }
+            self.session.value = value
+        except:
+            self.session.value = value
+            ret = {
+                   "session" : None
+            }
+
+        return ret
+
 
         
