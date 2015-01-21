@@ -465,7 +465,7 @@ def start(daemon=False):
             f.write(str(os.getpid()))
 
         webapps_list = analyse_and_pickle_webapps("%s/pickle/webapps" % config.temp, config.defaultapps, config.webapps)
-        if webapps_list:
+        if not webapps_list:
             print("SEVERE: No application deployed.")
             sys.exit(1)
 

@@ -242,20 +242,16 @@ class Webapp:
 
         for name, member in inspect.getmembers(module):
             if isfunction(member):
-                if hasattr(member, "_webmodule"):
+                if hasattr(member, "__webmodule__"):
                     if len(self.url_prefix) == 0:
                         url = utils.fixurl(member.__webmodule__['url'])
-                        if url in self.webmodules:
-                            print("WARNING: Url<%s> is already defined. "
-                                  "Ignoring webmodule<%s> defined in <%s>"
-                                  % (url, name, inspect.getmodule(member).__file__))
                         if self._check_url(url, name, member):
                             self.webmodules[url] = member.__webmodule__
                     else:
                         url = "/" + self.url_prefix + utils.fixurl(member.__webmodule__['url'])
                         if self._check_url(url, name, member):
                             self.webmodules[url] = member.__webmodule__
-                elif hasattr(member, "_preprocessor"):
+                elif hasattr(member, "__preprocessor__"):
                     if member.__preprocessor__['name'] in self.defined_preprocessors:
                         self.preprocessors.append(member.__preprocessor__)
                     else:
@@ -263,7 +259,7 @@ class Webapp:
                               "listed in preprocessor list.."
                               " Ignoring preprocessor."
                               % (self.name, member.__preprocessor__['name']))
-                elif hasattr(member, "_posthandler"):
+                elif hasattr(member, "__posthandler__"):
                     if member.__posthandler__['name'] in self.defined_posthandlers:
                         self.posthandlers.append(member.__posthandler__)
                     else:
@@ -271,7 +267,7 @@ class Webapp:
                               "listed in posthandler list.."
                               " Ignoring posthandler."
                               % (self.name, member.__posthandler__['name']))
-            elif isclass(member) and hasattr(member, "_webmodules"):
+            elif isclass(member) and hasattr(member, "__webmodules__"):
                 for webmodule in member.__webmodules__:
                     if len(self.url_prefix) == 0:
                         url = utils.fixurl(webmodule['url'])
