@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-#This file is part of BlackPearl.
+# This file is part of BlackPearl.
 
 #BlackPearl is free software: you can redistribute it and/or modify
 #it under the terms of the GNU General Public License as published by
@@ -15,27 +15,26 @@
 #You should have received a copy of the GNU General Public License
 #along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
 
-import os
 import json
 import inspect
 import traceback
 import builtins
-
 from time import strftime
 from http.cookiejar import CookieJar
-
 import urllib.request
 import urllib.parse
 
+import os
+
 
 __all__ = ['testset', 'testcase', 'test', 'TestcaseFailed',
-            'InvalidTestcaseInvoke',  'ErrorInvokingWebModule',
-            'TestcaseFailed', 'TestcaseError']
+           'InvalidTestcaseInvoke', 'ErrorInvokingWebModule',
+           'TestcaseFailed', 'TestcaseError']
 
 listen = "localhost:8080"
 
-class TestsetInvoker:
 
+class TestsetInvoker:
     def __init__(self, name, webmodule, function):
         self.function = function
         self.name = name
@@ -45,54 +44,55 @@ class TestsetInvoker:
         caller = self.__call__
         webmodule = self.webmodule
         opener = urllib.request.build_opener(
-                        urllib.request.HTTPCookieProcessor())
+            urllib.request.HTTPCookieProcessor())
 
         testset_outs = ['[%s] %s' % (strftime("%Y-%m-%d %H:%M:%S"),
-                                      "Invoking the Testset<%s>" % self.name)
-                       ]
+                                     "Invoking the Testset<%s>" % self.name)
+        ]
 
         try:
             self.function()
         except TestcaseFailed as e:
             testset_outs.append('[%s] %s' % (strftime("%Y-%m-%d %H:%M:%S"),
-                              "Testset<%s> execution failed." % self.name))
+                                             "Testset<%s> execution failed." % self.name))
             return {
-                "status" : -1,
-                "result" : "Failed",
-                "desc" : str(e),
-                "prints" : testset_outs
+                "status": -1,
+                "result": "Failed",
+                "desc": str(e),
+                "prints": testset_outs
             }
         except TestcaseError as e:
             print("ERROR: %s" % traceback.format_exc())
             testset_outs.append('[%s] %s' % (strftime("%Y-%m-%d %H:%M:%S"),
-                              "Testset<%s> terminated due to an internal"\
-                              " error." % self.name))
+                                             "Testset<%s> terminated due to an internal" \
+                                             " error." % self.name))
             return {
-                "status" : -3,
-                "result" : "ServerIssue",
-                "desc" : "Error occured in invoking the testcase. "\
-                         "Error: %s. Check the server log for"\
-                         " more details." % str(e),
-                 "prints" : testset_outs
+                "status": -3,
+                "result": "ServerIssue",
+                "desc": "Error occured in invoking the testcase. " \
+                        "Error: %s. Check the server log for" \
+                        " more details." % str(e),
+                "prints": testset_outs
             }
         except Exception as e:
             return {
-                "status" : -2,
-                "result" : "Error",
-                "desc" : "Error occured in invoking the Testcase<%s>. "\
-                         "Error: (%s) at line <%s>" % (self.name,
-                          type(e).__name__ + ": " + str(e) ,
-                          traceback.extract_tb(e.__traceback__)[-1][1]),
-                "prints" : testset_outs
+                "status": -2,
+                "result": "Error",
+                "desc": "Error occured in invoking the Testcase<%s>. " \
+                        "Error: (%s) at line <%s>" % (self.name,
+                                                      type(e).__name__ + ": " + str(e),
+                                                      traceback.extract_tb(e.__traceback__)[-1][1]),
+                "prints": testset_outs
             }
         else:
             testset_outs.append('[%s] %s' % (strftime("%Y-%m-%d %H:%M:%S"),
-                              "Testset<%s> successfully completed" % self.name))
+                                             "Testset<%s> successfully completed" % self.name))
             return {
-                "status" : 0,
-                "result" : "Success",
-                "prints" : testset_outs
+                "status": 0,
+                "result": "Success",
+                "prints": testset_outs
             }
+
 
 #python decorator
 def testset(name, webmodule):
@@ -113,15 +113,17 @@ def testset(name, webmodule):
 
         invoker = TestsetInvoker(name, webmodule, func)
 
-        func._testset = {
-            "name" : name,
-            "desc" : func.__doc__,
-            "webmodule" : _webmodule,
-            "func" : invoker,
+        func.__testset__ = {
+            "name": name,
+            "desc": func.__doc__,
+            "webmodule": _webmodule,
+            "func": invoker,
         }
 
         return func
+
     return alt_func
+
 
 def testcase(input):
     """testcase(input) function must be used within a testset.
@@ -138,25 +140,25 @@ input - should be a dict object containing the input values for webmodule"""
         #getting the opener object for this current testcase run.
         opener = prevframe.f_locals['opener']
     except:
-        raise InvalidTestcaseInvoke("The testcase function must be invoked "\
-                                    "from a function decorated with"\
+        raise InvalidTestcaseInvoke("The testcase function must be invoked " \
+                                    "from a function decorated with" \
                                     " @testset") from None
     else:
         try:
             #invoking the webmodule
-            rets =  _invoke_webmodule(opener, webmodule, input)
+            rets = _invoke_webmodule(opener, webmodule, input)
             return json.loads(rets.decode())
         except:
             #incase any error occurred during invoking of webmodule
             raise TestcaseError("Error: %s" % traceback.format_exc())
+
 
 def test(first, second):
     """compares the first and second values.
     If not equals, raises TestcaseFailed Exception"""
     #basic comparision
     if first != second:
-
-        raise TestcaseFailed("Test failed: Excepted value "\
+        raise TestcaseFailed("Test failed: Excepted value " \
                              ": <%s> Return value : <%s>" % (second, first))
 
 
@@ -172,6 +174,7 @@ def _invoke_webmodule(opener, url, input):
     response = opener.open("http://" + listen + url,
                            urllib.parse.urlencode(input).encode('UTF-8'))
     return response.read()
+
 
 def testprint(*args, **kwargs):
     try:
@@ -191,17 +194,22 @@ def testprint(*args, **kwargs):
         else:
             print(*args, **kwargs)
 
+
 class TestcaseFailed(Exception):
     pass
+
 
 class InvalidTestcaseInvoke(Exception):
     pass
 
+
 class ErrorInvokingWebModule(Exception):
     pass
 
+
 class TestcaseFailed(Exception):
     pass
+
 
 class TestcaseError(Exception):
     pass

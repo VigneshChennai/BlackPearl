@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-#This file is part of BlackPearl.
+# This file is part of BlackPearl.
 
 #BlackPearl is free software: you can redistribute it and/or modify
 #it under the terms of the GNU General Public License as published by
@@ -16,15 +16,16 @@
 #along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+
 import pyinotify
 
-class AsyncFileMonitor(pyinotify.Notifier):
 
+class AsyncFileMonitor(pyinotify.Notifier):
     def __init__(self, default_proc_fun, loop=None, read_freq=0,
                  threshold=0, timeout=None, channel_map=None):
         self._wm = pyinotify.WatchManager()
         pyinotify.Notifier.__init__(self, self._wm, default_proc_fun, read_freq,
-                          threshold, timeout)
+                                    threshold, timeout)
         if not loop:
             self.loop = asyncio.get_event_loop()
         self.loop.add_reader(self._fd, self._events_ready)
@@ -34,14 +35,16 @@ class AsyncFileMonitor(pyinotify.Notifier):
         if not self.wdd:
             self.path = path
             self.exclude_filter = exclude_filter
-            self.wdd = self._wm.add_watch(path, pyinotify.IN_DELETE | pyinotify.IN_CREATE | pyinotify.IN_CLOSE_WRITE, rec=rec,
-                            exclude_filter=exclude_filter)
+            self.wdd = self._wm.add_watch(path, pyinotify.IN_DELETE | pyinotify.IN_CREATE | pyinotify.IN_CLOSE_WRITE,
+                                          rec=rec,
+                                          exclude_filter=exclude_filter)
 
     def update_watch_path(self, rec=False):
         if self.wdd:
             self._wm.rm_watch(self.wdd.values(), rec=True)
-            self.wdd = self._wm.add_watch(self.path, pyinotify.IN_DELETE | pyinotify.IN_CREATE | pyinotify.IN_CLOSE_WRITE, rec=rec,
-                            exclude_filter=self.exclude_filter)
+            self.wdd = self._wm.add_watch(self.path,
+                                          pyinotify.IN_DELETE | pyinotify.IN_CREATE | pyinotify.IN_CLOSE_WRITE, rec=rec,
+                                          exclude_filter=self.exclude_filter)
 
     def _events_ready(self):
         self.read_events()

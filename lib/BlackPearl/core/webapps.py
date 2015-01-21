@@ -1,35 +1,36 @@
 #!/usr/bin/env python
 
-#This file is part of BlackPearl.
+# This file is part of BlackPearl.
 
-#BlackPearl is free software: you can redistribute it and/or modify
-#it under the terms of the GNU General Public License as published by
-#the Free Software Foundation, either version 3 of the License, or
-#(at your option) any later version.
+# BlackPearl is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 
-#BlackPearl is distributed in the hope that it will be useful,
-#but WITHOUT ANY WARRANTY; without even the implied warranty of
-#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#GNU General Public License for more details.
+# BlackPearl is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 
-#You should have received a copy of the GNU General Public License
-#along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
+# You should have received a copy of the GNU General Public License
+# along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
 
 import traceback
 import sys
+import inspect
 import os
 import importlib
-import inspect
 
 from . import utils
 from .exceptions import RequestInvalid
 
-class Webapp:
-    """This class holds all the values corresponding to a webapplication"""
 
-    def __init__(self, app_location, foldername):
-        self.location = app_location + "/" + foldername
-        self.foldername = foldername
+class Webapp:
+    """This class holds all the values corresponding to a web application"""
+
+    def __init__(self, app_location, folder_name):
+        self.location = app_location + "/" + folder_name
+        self.folder_name = folder_name
         self.name = None
         self.handlers = []
         self.webmodules = {}
@@ -45,21 +46,21 @@ class Webapp:
 
     def __str__(self):
         return "\n\tWebapp Name : %s\n" \
-                "\tLocation : %s\n"\
-                "\tHandler defined : %s\n"\
-                "\tWeb modules : %s\n"\
-                "\tPreprocessors : %s\n"\
-                "\tPosthandlers : %s\n"\
-                "\tTestsets : %s\n" % (
-                self.name or self.foldername,
-                self.location,
-                self.handlers,
-                [ url for url in self.webmodules.keys()],
-                self.preprocessors,
-                self.posthandlers,
-                ["For webmodule: " + key + " " + str([testset['name'] for testset in testsets])
+               "\tLocation : %s\n" \
+               "\tHandler defined : %s\n" \
+               "\tWeb modules : %s\n" \
+               "\tPreprocessors : %s\n" \
+               "\tPosthandlers : %s\n" \
+               "\tTestsets : %s\n" % (
+                   self.name or self.folder_name,
+                   self.location,
+                   self.handlers,
+                   [url for url in self.webmodules.keys()],
+                   self.preprocessors,
+                   self.posthandlers,
+                   ["For webmodule: " + key + " " + str([testset['name'] for testset in testsets])
                     for key, testsets in self.testsets.items()]
-                )
+               )
 
     def handle_request(self, session, url, parameter):
         """This function handles the user request"""
@@ -71,37 +72,36 @@ class Webapp:
             raise ValueError("Invalid url : " + url)
 
         try:
-            parameter = utils._validate_parameter(signature, parameter)
+            parameter = utils.validate_parameter(signature, parameter)
         except Exception as e:
             return {
-                "status" : -201,
-                "desc" : str(e)
+                "status": -201,
+                "desc": str(e)
             }
         try:
-            rets = {
-                "status" : 0,
-                "data" : func(session, parameter),
+            ret = {
+                "status": 0,
+                "data": func(session, parameter),
             }
-            return rets
+            return ret
         except RequestInvalid as ri:
             return {
-                "status" : -202,
-                "desc" : str(ri)
+                "status": -202,
+                "desc": str(ri)
             }
-        except Exception as e:
+        except Exception:
             error = traceback.format_exc()
             return {
-                "status" : -203,
-                "desc" : error
+                "status": -203,
+                "desc": error
             }
 
     def initialize(self):
         """initializes the webapp"""
         try:
-            config = importlib.import_module(self.foldername + ".config")
+            config = importlib.import_module(self.folder_name + ".config")
         except ImportError:
-            print("SEVERE: config.py not found inside webapp <%s>"
-                    % (self.foldername))
+            print("SEVERE: config.py not found inside webapp <%s>" % self.folder_name)
             return False
 
         self._init_basics(config)
@@ -113,9 +113,9 @@ class Webapp:
 
         try:
             try:
-                test = importlib.import_module(self.foldername + ".test")
+                test = importlib.import_module(self.folder_name + ".test")
             except ImportError as e:
-                print("WARNING: Failed to initialize testcase "\
+                print("WARNING: Failed to initialize testcase "
                       "in the webapp <%s>" % self.name)
                 print("WARNING: Reason: %s" % str(e))
             else:
@@ -127,15 +127,15 @@ class Webapp:
 
         return True
 
-    def _init_basics(self,config):
+    def _init_basics(self, config):
         """Basic details about the webapp is initialized using this function"""
         try:
             self.name = config.name
         except AttributeError:
-            self.name = self.foldername
+            self.name = self.folder_name
 
         try:
-            desc_mod = importlib.import_module(self.foldername)
+            desc_mod = importlib.import_module(self.folder_name)
             self.desc = desc_mod.__doc__
         except AttributeError:
             self.desc = None
@@ -144,9 +144,9 @@ class Webapp:
             self.session_enabled = config.session_enabled
             if self.session_enabled:
                 try:
-                    self.session_retension = config.session_retension
+                    self.session_retention = config.session_retention
                 except:
-                    self.session_retension = None
+                    self.session_retention = None
         except AttributeError:
             self.session_enabled = False
             self.session_enabled = None
@@ -155,13 +155,13 @@ class Webapp:
             if config.url_prefix == "ROOT":
                 self.url_prefix = ""
             elif self.url_prefix == "":
-                print("WARNING: Webapp<%s> - Empty url_prefix is set in the" \
-                        " configuration file" % (self.name))
-                self.url_prefix = self.foldername
+                print("WARNING: Webapp<%s> - Empty url_prefix is set in the"
+                      " configuration file" % self.name)
+                self.url_prefix = self.folder_name
             else:
                 self.url_prefix = config.url_prefix
         except AttributeError:
-            self.url_prefix = self.foldername
+            self.url_prefix = self.folder_name
 
         try:
             self.defined_posthandlers = config.posthandlers
@@ -173,47 +173,43 @@ class Webapp:
         except:
             pass
 
-    def _init_handlers(self,config):
+    def _init_handlers(self, config):
         """Initializes the defined handler in the webapp"""
         try:
             self.handlers = config.handlers
             if len(self.handlers) == 0:
                 raise AttributeError("Handlers list is empty")
-        except AttributeError as e:
-            print("SEVERE: Webapp<%s> - configuration doesn't defined" \
-                    " the list of handlers."
-                    % (self.name))
-            print("WARNING: See below for error occured.\n"
-                    + traceback.format_exc())
+        except AttributeError:
+            print("SEVERE: Webapp<%s> - configuration doesn't defined"
+                  " the list of handlers." % self.name)
+            print("WARNING: See below for error occurred.\n"
+                  + traceback.format_exc())
             raise Exception("Error initializing handlers")
 
-        try:
-            count = 0
-            for handler in self.handlers:
-                print("INFO: Initializing handler <%s>" % (handler))
+        count = 0
+        for handler in self.handlers:
+            try:
+                print("INFO: Initializing handler <%s>" % handler)
                 module = importlib.import_module(handler)
                 self._parse_module(module)
                 count += 1
-        except:
-            print("WARNING: Webapp<%s> - Error initializing handler <%s>." \
-                     "Ignoring handler .." % (self.name, handler))
-            print("WARNING: See below for error occured.\n"
-                    + traceback.format_exc())
+            except:
+                print("WARNING: Webapp<%s> - Error initializing handler <%s>."
+                      "Ignoring handler .." % (self.name, handler))
+                print("WARNING: See below for error occurred.\n"
+                      + traceback.format_exc())
 
         if count == 0:
-            print("SEVERE: Webapp<%s> - Failed to import all the defined" \
-                    " handler." % (self.name))
+            print("SEVERE: Webapp<%s> - Failed to import all the defined"
+                  " handler." % self.name)
             raise Exception("Error initializing handlers")
 
     def _init_testcases(self, test):
         print("INFO: Initializing testcases")
 
-        ismethod = inspect.ismethod
-        isclass = inspect.isclass
-
         for name, member in inspect.getmembers(test):
             try:
-                testset = member._testset
+                testset = member.__testset__
             except:
                 pass
             else:
@@ -233,74 +229,68 @@ class Webapp:
 
                 testset['func'].webmodule = webmodule
 
+    def _check_url(self, url, name, member):
+        if url in self.webmodules:
+            print("WARNING: Url<%s> is already defined. "
+                  "Ignoring webmodule<%s> defined in <%s>" % (url, name, inspect.getmodule(member).__file__))
+            return False
+        return True
 
     def _parse_module(self, module):
         isfunction = inspect.isfunction
         isclass = inspect.isclass
 
-        def checkurl(url, name, member):
-            if url in self.webmodules:
-                print("WARNING: Url<%s> is already defined. "\
-                      "Ignoring webmodule<%s> defined in <%s>" %(
-                          url, name,
-                          inspect.getmodule(member).__file__))
-                return False
-            return True
-
         for name, member in inspect.getmembers(module):
             if isfunction(member):
                 if hasattr(member, "_webmodule"):
                     if len(self.url_prefix) == 0:
-                        url = utils.fixurl(member._webmodule['url'])
+                        url = utils.fixurl(member.__webmodule__['url'])
                         if url in self.webmodules:
-                            print("WARNING: Url<%s> is already defined. "\
-                                  "Ignoring webmodule<%s> defined in <%s>" %(
-                                      url, name,
-                                      inspect.getmodule(member).__file__))
-                        if checkurl(url, name, member):
-                            self.webmodules[url] = member._webmodule
+                            print("WARNING: Url<%s> is already defined. "
+                                  "Ignoring webmodule<%s> defined in <%s>"
+                                  % (url, name, inspect.getmodule(member).__file__))
+                        if self._check_url(url, name, member):
+                            self.webmodules[url] = member.__webmodule__
                     else:
-                        url = "/" + self.url_prefix + utils.fixurl(member._webmodule['url'])
-                        if checkurl(url, name, member):
-                            self.webmodules[url] = member._webmodule
+                        url = "/" + self.url_prefix + utils.fixurl(member.__webmodule__['url'])
+                        if self._check_url(url, name, member):
+                            self.webmodules[url] = member.__webmodule__
                 elif hasattr(member, "_preprocessor"):
-                    if member._preprocessor['name'] in self.defined_preprocessors:
-                        self.preprocessors.append(member._preprocessor)
+                    if member.__preprocessor__['name'] in self.defined_preprocessors:
+                        self.preprocessors.append(member.__preprocessor__)
                     else:
-                        print("WARNING: Webapp <%s> - Preprocessor<%s> not "\
-                              "listed in preprocessor list.." \
-                              " Ignoring preprocessor." % (self.name,
-                                 member._preprocessor['name']
-                                 ))
+                        print("WARNING: Webapp <%s> - Preprocessor<%s> not "
+                              "listed in preprocessor list.."
+                              " Ignoring preprocessor."
+                              % (self.name, member.__preprocessor__['name']))
                 elif hasattr(member, "_posthandler"):
-                    if member._posthandler['name'] in self.defined_posthandlers:
-                        self.posthandlers.append(member._posthandler)
+                    if member.__posthandler__['name'] in self.defined_posthandlers:
+                        self.posthandlers.append(member.__posthandler__)
                     else:
-                        print("WARNING: Webapp <%s> - Posthandler<%s> not "\
-                              "listed in posthandler list.." \
-                              " Ignoring posthandler." % (self.name,
-                                 member._posthandler['name']
-                                 ))
+                        print("WARNING: Webapp <%s> - Posthandler<%s> not "
+                              "listed in posthandler list.."
+                              " Ignoring posthandler."
+                              % (self.name, member.__posthandler__['name']))
             elif isclass(member) and hasattr(member, "_webmodules"):
-                for webmodule in member._webmodules:
+                for webmodule in member.__webmodules__:
                     if len(self.url_prefix) == 0:
                         url = utils.fixurl(webmodule['url'])
-                        if checkurl(url, name, member):
+                        if self._check_url(url, name, member):
                             self.webmodules[url] = webmodule
                     else:
                         url = "/" + self.url_prefix + utils.fixurl(webmodule['url'])
-                        if checkurl(url, name, member):
+                        if self._check_url(url, name, member):
                             self.webmodules[url] = webmodule
 
 
 def initialize(location):
-    """Initializes the webapplications"""
+    """Initializes the web applications"""
 
-    print("INFO: Adding <%s> to python path." % (location))
+    print("INFO: Adding <%s> to python path." % location)
     sys.path.append(location)
 
-    webapps_folder = [name for name in os.listdir(location)\
-                         if os.path.isdir(location + os.path.sep + name)]
+    webapps_folder = [name for name in os.listdir(location)
+                      if os.path.isdir(location + os.path.sep + name)]
     print("Webapps folder: " + str(webapps_folder))
     webapps = []
     for webapp_folder in webapps_folder:
@@ -315,6 +305,5 @@ def initialize(location):
             print("Error initializing : %s" % webapp_folder)
 
     print("INFO: Webapps deployed at <%s> initialized" % location)
-    print("INFO: List of initialized webapps : %s" % (webapps))
+    print("INFO: List of initialized webapps : %s" % webapps)
     return webapps
-

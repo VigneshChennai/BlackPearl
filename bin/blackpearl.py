@@ -1,20 +1,19 @@
-#!/bin/env python
+#!/usr/bin/env python
 
-#This file is part of BlackPearl.
+# This file is part of BlackPearl.
 
-#BlackPearl is free software: you can redistribute it and/or modify
-#it under the terms of the GNU General Public License as published by
-#the Free Software Foundation, either version 3 of the License, or
-#(at your option) any later version.
+# BlackPearl is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 
-#BlackPearl is distributed in the hope that it will be useful,
-#but WITHOUT ANY WARRANTY; without even the implied warranty of
-#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#GNU General Public License for more details.
+# BlackPearl is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 
-#You should have received a copy of the GNU General Public License
-#along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
-
+# You should have received a copy of the GNU General Public License
+# along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
 import os
@@ -25,7 +24,7 @@ import signal
 
 from BlackPearl.server import appserver, config
 
-startupnotes = """
+startup_notes = """
     BlackPearl is free software. License GPLv3+: GNU GPL version 3 or later
     <http://gnu.org/licenses/gpl.html>
 
@@ -41,10 +40,11 @@ author = """
     Written by Vigneshwaran P (https://github.com/VigneshChennai)
 """
 
-class color:
+
+class Color:
     PURPLE = '\033[95m'
     CYAN = '\033[96m'
-    DARKCYAN = '\033[36m'
+    DARK_CYAN = '\033[36m'
     BLUE = '\033[94m'
     GREEN = '\033[92m'
     YELLOW = '\033[93m'
@@ -53,8 +53,9 @@ class color:
     UNDERLINE = '\033[4m'
     END = '\033[0m'
 
+
 def usage():
-    print("""**Usage**
+    print("""Usage:
 
 Syntax: blackpearl.py <option>
 
@@ -62,10 +63,11 @@ Options:
     1. startup
     2. shutdown""")
 
-def startserver(daemon):
-    print(color.BOLD + '\nBlackPearl' + color.END)
-    print(startupnotes)
-    print(color.BOLD + 'Author' + color.END)
+
+def start_server(daemon):
+    print(Color.BOLD + '\nBlackPearl' + Color.END)
+    print(startup_notes)
+    print(Color.BOLD + 'Author' + Color.END)
     print(author)
 
     if os.access(config.temp, os.F_OK):
@@ -73,7 +75,7 @@ def startserver(daemon):
             with open(os.path.join(config.temp, "BlackPearl.pid")) as f:
                 pid = f.read()
             os.kill(int(pid), 0)
-            print("BlackPearl is currently running. "\
+            print("BlackPearl is currently running. "
                   "Shutdown it before starting it up again.\n")
             return
         except:
@@ -84,15 +86,15 @@ def startserver(daemon):
     os.mkdir(config.temp)
     os.mkdir(config.logs)
     os.mkdir(os.path.join(config.temp, 'pickle'))
-    open(os.path.join(config.temp,"uwsgi_worker_reload.file"), "w").close()
+    open(os.path.join(config.temp, "uwsgi_worker_reload.file"), "w").close()
     print("\nStarting BlackPearl server ...")
     print("Generating log files at %s" % config.logs)
     appserver.start(daemon)
 
 
-def stopserver():
-    print("Stopping BlackPearl services in localhost"\
-         "running on <%s> user account" % pwd.getpwuid(os.getuid())[0])
+def stop_server():
+    print("Stopping BlackPearl services in localhost "
+          "running on <%s> user account" % pwd.getpwuid(os.getuid())[0])
     if os.access(config.temp, os.F_OK):
         print("Trying to stop BlackPearl service ...", end="")
         try:
@@ -119,15 +121,12 @@ def stopserver():
 if __name__ == "__main__":
     if len(sys.argv) == 2:
         if sys.argv[1] == "startup":
-            startserver(daemon=True)
+            start_server(daemon=True)
         elif sys.argv[1] == "shutdown":
-            stopserver()
+            stop_server()
         else:
             print("Invalid arguments passes. <%s>" % sys.argv[1:])
             usage()
     else:
         print("Invalid arguments passes. <%s>" % sys.argv[1:])
         usage()
-
-
-    

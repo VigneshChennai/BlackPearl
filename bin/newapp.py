@@ -1,22 +1,23 @@
-#!/bin/env python
+#!/usr/bin/env python
 
-#This file is part of BlackPearl.
+# This file is part of BlackPearl.
 
-#BlackPearl is free software: you can redistribute it and/or modify
-#it under the terms of the GNU General Public License as published by
-#the Free Software Foundation, either version 3 of the License, or
-#(at your option) any later version.
+# BlackPearl is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 
-#BlackPearl is distributed in the hope that it will be useful,
-#but WITHOUT ANY WARRANTY; without even the implied warranty of
-#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#GNU General Public License for more details.
+# BlackPearl is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 
-#You should have received a copy of the GNU General Public License
-#along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
+# You should have received a copy of the GNU General Public License
+# along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
 import sys
+
 
 def usage():
     print("""
@@ -25,7 +26,7 @@ Usage : newapp
     newapp <appname>
 
 Example :
-    newapp mynewapp
+    newapp my_new_app
 """)
 
 config_file = """#!/bin/env python
@@ -43,9 +44,9 @@ email = "{emailid}"
 
 name= "{appname}"
 
-#URL Prefix for the webapplication.
+#URL Prefix for the web application.
 #
-#If it is not specifed, the foldername of the webapplication will be taken as
+#If it is not specified, the folder name of the web application will be taken as
 #url_prefix
 #
 #A url_prefix "ROOT" will make the application to hosted on the root level.
@@ -65,9 +66,9 @@ url_prefix="{appname}"
 #The functions which are using @weblocation decorate but not in the below listed
 #python files will be ignored.
 #
-#Example : if python file is (Webapp/hander.py)
+#Example : if python file is (Webapp/handler.py)
 #then
-#handlers = ['Webapp.hander']
+#handlers = ['Webapp.handler']
 
 handlers = ["{appname}.handlers"]
 
@@ -80,11 +81,11 @@ session_enabled = True
 #Note: The list defined here are for specifying the order of execution only.
 #      The preprocessors must be decorate with @preprocessor decorator
 #
-#This is not the python files, it should the list of fulle python function name
+#This is not the python files, it should the list of full python function name
 #
-#Example : if python function "preprocessor" listed under Webapp/hander.py file
+#Example : if python function "preprocessor" listed under Webapp/handler.py file
 #then
-#preprocessor = ['Webapp.hander.preprocessor']
+#preprocessor = ['Webapp.handler.preprocessor']
 
 preprocessors = []
 
@@ -95,9 +96,9 @@ preprocessors = []
 #
 #This is not the python files, it should the list of full python function name
 #
-#Example : if python function "posthandler" listed under Webapp/hander.py file
+#Example : if python function "posthandler" listed under Webapp/handler.py file
 #then
-#posthandler = ['Webapp.hander.posthandler']
+#posthandler = ['Webapp.handler.posthandler']
 
 posthandlers = []
 
@@ -112,10 +113,11 @@ from BlackPearl.core.decorators import weblocation
 def hello():
     ret = {
             "msg" : "Hello world",
-            "desc" : "My first helloworld BlackPearl web application"
+            "desc" : "My first hello world BlackPearl web application"
     }
     return ret
 """
+
 
 def main():
 
@@ -127,22 +129,21 @@ def main():
         print("ERROR: Unable to create folder on the current working directory")
         sys.exit(1)
 
-    appname = sys.argv[1]
-    fullappname = input("Application Full Name : ")
+    app_name = sys.argv[1]
+    full_app_name = input("Application Full Name : ")
     author = input("Author Name : ")
     website = input("Website : ")
-    emailid = input("Email Address : ")
+    email_id = input("Email Address : ")
 
-    os.mkdir(appname)
-    with open(os.path.join(appname, 'config.py'), "w") as f:
-        f.write(config_file.format(appname=appname,
-                   fullappname=fullappname,
-                   author=author,
-                   website=website,
-                   emailid=emailid)
-               )
+    os.mkdir(app_name)
+    with open(os.path.join(app_name, 'config.py'), "w") as f:
+        f.write(config_file.format(appname=app_name,
+                                   fullappname=full_app_name,
+                                   author=author,
+                                   website=website,
+                                   emailid=email_id))
 
-    with open(os.path.join(appname, 'handlers.py'), "w") as f:
+    with open(os.path.join(app_name, 'handlers.py'), "w") as f:
         f.write(handlers_file)
 
 if __name__ == "__main__":
