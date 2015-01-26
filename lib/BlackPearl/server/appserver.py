@@ -21,14 +21,14 @@ import signal
 import asyncio
 import multiprocessing
 import pickle
-
 import os
-import pyinotify
 import functools
+
+import pyinotify
+
 from BlackPearl.server.core.process import Process, NotStartedYet, NotRestartedYet
 from BlackPearl.server.utils import prechecks, fileutils
 from BlackPearl.server.core.logger import Logger
-from BlackPearl.server import config
 from BlackPearl.core import webapps as webapps
 
 
@@ -78,22 +78,27 @@ def precheck():
 
 
 class Uwsgi(Process):
-    def __init__(self, uwsgi_loc, temp_loc, uwsgi_file, socket_file, logs_dir):
+    def __init__(self, uwsgi_loc, uwsgi_file, socket_file, logs_dir, run_loc,
+                 security_key, security_block_size, nginx_bind, pypath):
 
-        self.temp_loc = temp_loc
+        self.run_loc = run_loc
         self.uwsgi_loc = uwsgi_loc
         self.uwsgi_sock = socket_file
         self.uwsgi_file = uwsgi_file
         self.logs_dir = logs_dir
+        self.security_key = security_key
+        self.security_block_size = security_block_size
+        self.nginx_bind = nginx_bind
+        self.pypath = pypath
 
         command = [self.uwsgi_loc, '--plugins', 'python',
                    '--socket', self.uwsgi_sock,
                    '--wsgi-file', self.uwsgi_file,
                    '--enable-threads', '--logto',
                    '%s/uwsgi.log' % self.logs_dir,
-                   '--pidfile', '%s/uwsgi.pid' % self.temp_loc,
+                   '--pidfile', '%s/uwsgi.pid' % self.run_loc,
                    '--buffer-size=32768',
-                   '--touch-workers-reload', '%s/uwsgi_worker_reload.file' % self.temp_loc,
+                   '--touch-workers-reload', '%s/uwsgi_worker_reload.file' % self.run_loc,
                    '--workers', str(multiprocessing.cpu_count()),
                    '--lazy-apps']
 
@@ -107,16 +112,11 @@ class Uwsgi(Process):
 
         super().__init__(name="uWsgi Service", command=command,
                          env={
-                             "BLACKPEARL_TMP": config.temp,
-                             "BLACKPEARL_ENCRYPT_KEY": str(config.security_key),
-                             "BLACKPEARL_ENCRYPT_BLOCK_SIZE": str(config.security_block_size),
-                             "BLACKPEARL_LISTEN": str(config.listen),
-                             "PYTHONPATH": ":".join([
-                                 config.lib,
-                                 config.webapps,
-                                 config.adminapps,
-                                 config.defaultapps
-                             ])
+                             "BLACKPEARL_RUN": self.run_loc,
+                             "BLACKPEARL_ENCRYPT_KEY": self.security_key,
+                             "BLACKPEARL_ENCRYPT_BLOCK_SIZE": str(self.security_block_size),
+                             "BLACKPEARL_LISTEN": str(self.nginx_bind),
+                             "PYTHONPATH": ":".join(self.pypath)
                          })
 
     def reload_conf(self):
@@ -124,17 +124,18 @@ class Uwsgi(Process):
 
 
 class Nginx(Process):
-    def __init__(self, hostname, listen, socket, webapps_loc,
-                 temp_loc, share_loc, logs_loc):
+    def __init__(self, nginx_loc, hostname, listen, socket, webapps_loc,
+                 run_loc, share_loc, logs_loc):
+        self.nginx_loc = nginx_loc
         self.hostname = hostname
         self.listen = listen
         self.socket = socket
         self.webapps_loc = webapps_loc
-        self.temp_loc = temp_loc
+        self.run_loc = run_loc
         self.share_loc = share_loc
         self.logs_loc = logs_loc
 
-        command = [config.nginx, '-c', '{tmp}/nginx.conf'.format(tmp=self.temp_loc)]
+        command = [self.nginx_loc, '-c', '{tmp}/nginx.conf'.format(tmp=self.run_loc)]
 
         super().__init__(name="Nginx Service", command=command)
 
@@ -177,7 +178,7 @@ class Nginx(Process):
                     webapp.location))
                 root_location.append(location)
 
-        conf = "\n pid  %s/nginx.pid;" % self.temp_loc
+        conf = "\n pid  %s/nginx.pid;" % self.run_loc
         conf += "\n daemon off;"
         conf += "\n worker_processes %s;" % str(multiprocessing.cpu_count())
         conf += "\n\n events {"
@@ -225,25 +226,35 @@ class Nginx(Process):
         conf += "\n\t }"
         conf += "\n }"
 
-        with open("%s/nginx.conf" % self.temp_loc, "w") as f:
+        with open("%s/nginx.conf" % self.run_loc, "w") as f:
             f.write(conf)
 
 
 class AppServer():
-    def __init__(self, options, webapps_list):
-        self.uwsgi = Uwsgi(options['uwsgi'],
-                           options['temp'],
-                           options['home'] + "/lib/wsgi.py",
-                           options['temp'] + "/wsgi.sock",
-                           options['logs'])
+    def __init__(self, config, webapps_list):
+        self.config = config
+        self.uwsgi = Uwsgi(
+            config.uwsgi,
+            config.home + "/lib/wsgi.py",
+            config.run + "/wsgi.sock",
+            config.logs,
+            config.run,
+            config.security_key,
+            config.security_block_size,
+            config.listen,
+            [config.lib, config.defaultapps, config.webapps, config.adminapps]
+        )
 
-        self.nginx = Nginx(options['hostname'],
-                           options['listen'],
-                           options['temp'] + "/wsgi.sock",
-                           options['webapps'],
-                           options['temp'],
-                           options['share'],
-                           options['logs'])
+        self.nginx = Nginx(
+            config.nginx,
+            config.hostname,
+            config.listen,
+            self.uwsgi.uwsgi_sock,
+            config.webapps,
+            config.run,
+            config.share,
+            config.logs
+        )
         self.nginx.generate_conf_file(webapps_list)
         self.status = "NOTSTARTED"
         self.reload_code_called = False
@@ -260,9 +271,9 @@ class AppServer():
         else:
             if not running:
                 webapps_list = analyse_and_pickle_webapps(
-                    "%s/pickle/webapps" % config.temp,
-                    config.defaultapps,
-                    config.webapps
+                    "%s/pickle/webapps" % self.config.run,
+                    self.config.defaultapps,
+                    self.config.webapps
                 )
                 self.afm.update_watch_path(rec=True)
                 if not webapps_list:
@@ -282,12 +293,12 @@ class AppServer():
 
     def _init_code_update_monitor(self):
         paths = [
-            config.defaultapps,
-            config.webapps
+            self.config.defaultapps,
+            self.config.webapps
         ]
         excl = pyinotify.ExcludeFilter([
-            config.defaultapps + "/*/static",
-            config.webapps + "/*/static"
+            self.config.defaultapps + "/*/static",
+            self.config.webapps + "/*/static"
         ])
         self.afm = fileutils.AsyncFileMonitor(self._file_modified_callback)
         self.afm.set_watch_path(paths, rec=True, exclude_filter=excl)
@@ -341,7 +352,7 @@ class AppServer():
     def code_updated(self, webapps_list):
         print("INFO: Code updated.")
         self.nginx.generate_conf_file(webapps_list)
-        with open('%s/uwsgi_worker_reload.file' % self.uwsgi.temp_loc, "w") as f:
+        with open('%s/uwsgi_worker_reload.file' % self.uwsgi.run_loc, "w") as f:
             f.write("reload workers")
         self.nginx.reload_conf()
 
@@ -414,7 +425,7 @@ class AppServer():
             return True
 
 
-def start(daemon=False):
+def start(config, daemon=False):
     print("Performing precheck .... ", end="")
     if not precheck():
         print("[Failed]\nNode not started ....")
@@ -461,21 +472,22 @@ def start(daemon=False):
 
         logger = Logger(Logger.INFO)
         logger.initialize()
-        with open(config.temp + "/BlackPearl.pid", "w") as f:
+        with open(config.run + "/BlackPearl.pid", "w") as f:
             f.write(str(os.getpid()))
 
-        webapps_list = analyse_and_pickle_webapps("%s/pickle/webapps" % config.temp, config.defaultapps, config.webapps)
+        webapps_list = analyse_and_pickle_webapps(
+            "%s/pickle/webapps" % config.run,
+            config.defaultapps,
+            config.adminapps,
+            config.webapps
+        )
         if not webapps_list:
             print("SEVERE: No application deployed.")
             sys.exit(1)
 
         ev_loop = asyncio.get_event_loop()
 
-        options = {}
-        for option in config.__options__:
-            options[option] = config.__dict__[option]
-
-        app_server = AppServer(options, webapps_list)
+        app_server = AppServer(config, webapps_list)
 
         ev_loop.call_soon(app_server.start)
 

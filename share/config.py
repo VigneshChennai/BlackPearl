@@ -15,28 +15,27 @@
 # You should have received a copy of the GNU General Public License
 # along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
 
-import pwd
+import os
+import base64
 
-from os import getuid
 from os.path import dirname, realpath, join
 
-__options__ = ['home', 'share', 'lib', 'webapps', 'adminapps', 'defaultapps',
-               'temp', 'logs', 'hostname', 'nginx', 'uwsgi',
-               'listen', 'security_key', 'security_block_size']
-
-home = dirname(dirname(dirname(dirname(realpath(__file__)))))
+home = dirname(dirname(realpath(__file__)))
 share = join(home, 'share')
+
 lib = join(home, 'lib')
-webapps = join(home, 'webapps')
 adminapps = join(share, 'adminapps')
 defaultapps = join(share, 'builtinapps')
-temp = '/tmp/BlackPearl-' + pwd.getpwuid(getuid())[0]
-logs = join(temp, 'logs')
+webapps = join(share, 'webapps')
+
+run = join(home, 'run')
+logs = join(home, join('var', 'logs'))
 
 nginx = 'nginx'
 uwsgi = 'uwsgi'
 hostname = 'localhost'
 listen = '127.0.0.1:8080'
 
-security_key = "asdf2345sdfghhjk"
 security_block_size = 16
+security_key = base64.b64encode(os.urandom(security_block_size))
+

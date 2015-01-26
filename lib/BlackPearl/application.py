@@ -27,6 +27,7 @@ from BlackPearl.core import sessions
 from BlackPearl.core import exceptions
 from BlackPearl.core import security
 from BlackPearl.testing import testing
+import base64
 
 
 modules = {}
@@ -171,11 +172,11 @@ def initialize():
     global modules, deployed_webapps
     # initializing the webapps from the pickled file.
     print("Initializing webapps")
-    temp = os.environ["BLACKPEARL_TMP"]
+    run = os.environ["BLACKPEARL_RUN"]
     security.BLOCK_SIZE = int(os.environ['BLACKPEARL_ENCRYPT_BLOCK_SIZE'])
-    security.AES_KEY = os.environ['BLACKPEARL_ENCRYPT_KEY']
+    security.AES_KEY = base64.b64decode(os.environ['BLACKPEARL_ENCRYPT_KEY'])
     testing.listen = os.environ['BLACKPEARL_LISTEN']
-    pfile = open("%s/pickle/webapps" % temp, "rb")
+    pfile = open("%s/pickle/webapps" % run, "rb")
     with pfile:
         deployed_webapps = pickle.load(pfile)
 
