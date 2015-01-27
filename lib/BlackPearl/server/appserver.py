@@ -42,9 +42,11 @@ def analyse_and_pickle_webapps(picklefile, *appdirs):
     def analyser(queue):
         try:
             webapps_list = []
+            print("INFO: Analysing deployed webapps ....")
             for appdir in appdirs:
-                print("INFO: Analysing deployed webapps ....")
-                webapps_list.extend(webapps.initialize(appdir))
+                temp = webapps.initialize(appdir)
+                if temp:
+                    webapps_list.extend(temp)
             print("INFO: Webapps analysing completed.")
             print("INF0: Writing analysed information to <%s>" % picklefile)
             with open(picklefile, "wb") as pfile:

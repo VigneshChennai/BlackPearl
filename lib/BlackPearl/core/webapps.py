@@ -281,6 +281,9 @@ class Webapp:
 
 def initialize(location):
     """Initializes the web applications"""
+    if not os.access(location, os.F_OK):
+        print("WARNING: Webapps folder<%s> not found. Ignoring.. " % location)
+        return
 
     print("INFO: Adding <%s> to python path." % location)
     sys.path.append(location)
