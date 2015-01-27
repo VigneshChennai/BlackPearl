@@ -124,7 +124,7 @@ class Configuration:
     __options__ = [
         'home', 'share', 'lib', 'webapps', 'adminapps', 'defaultapps', 'run',
         'logs', 'hostname', 'nginx', 'uwsgi',
-        'listen', 'security_key', 'security_block_size'
+        'listen', 'security_key', 'security_block_size', 'uwsgi_options'
     ]
 
     __config_loc__ = [

@@ -171,7 +171,6 @@ def __application__(environ, start_response):
 def initialize():
     global modules, deployed_webapps
     # initializing the webapps from the pickled file.
-    print("Initializing webapps")
     run = os.environ["BLACKPEARL_RUN"]
     security.BLOCK_SIZE = int(os.environ['BLACKPEARL_ENCRYPT_BLOCK_SIZE'])
     security.AES_KEY = base64.b64decode(os.environ['BLACKPEARL_ENCRYPT_KEY'])

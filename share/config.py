@@ -39,3 +39,7 @@ listen = '127.0.0.1:8080'
 security_block_size = 16
 security_key = base64.b64encode(os.urandom(security_block_size))
 
+uwsgi_options = {
+    'plugins': 'python',
+    'log-truncate': 'true'
+}

@@ -78,8 +78,12 @@ def precheck():
 
 
 class Uwsgi(Process):
+    __immutable_options__ = [
+        'socket', 'wsgi-file', 'log-to', 'pidfile', 'touch-workers-reload', 'lazy-apps'
+    ]
+
     def __init__(self, uwsgi_loc, uwsgi_file, socket_file, logs_dir, run_loc,
-                 security_key, security_block_size, nginx_bind, pypath):
+                 security_key, security_block_size, nginx_bind, pypath, uwsgi_options):
 
         self.run_loc = run_loc
         self.uwsgi_loc = uwsgi_loc
@@ -90,25 +94,9 @@ class Uwsgi(Process):
         self.security_block_size = security_block_size
         self.nginx_bind = nginx_bind
         self.pypath = pypath
+        self.uwsgi_options = uwsgi_options
 
-        command = [self.uwsgi_loc, '--plugins', 'python',
-                   '--socket', self.uwsgi_sock,
-                   '--wsgi-file', self.uwsgi_file,
-                   '--enable-threads', '--logto',
-                   '%s/uwsgi.log' % self.logs_dir,
-                   '--pidfile', '%s/uwsgi/uwsgi.pid' % self.run_loc,
-                   '--buffer-size=32768',
-                   '--touch-workers-reload', '%s/uwsgi/worker_reload.file' % self.run_loc,
-                   '--workers', str(multiprocessing.cpu_count()),
-                   '--lazy-apps']
-
-        try:
-            virtenv = os.environ['VIRTUAL_ENV']
-            print("INFO: Using python at <%s> for uwsgi service" % virtenv)
-            command.append('--home')
-            command.append(virtenv)
-        except:
-            print("INFO: Using system installed python for uwsgi service")
+        command = [self.uwsgi_loc, '--ini', "%s/uwsgi/uwsgi.conf" % self.run_loc]
 
         super().__init__(name="uWsgi Service", command=command,
                          env={
@@ -118,6 +106,36 @@ class Uwsgi(Process):
                              "BLACKPEARL_LISTEN": str(self.nginx_bind),
                              "PYTHONPATH": ":".join(self.pypath)
                          })
+
+    def generate_conf_file(self):
+        config = {
+            "socket": self.uwsgi_sock,
+            "wsgi-file": self.uwsgi_file,
+            "logto": '%s/uwsgi.log' % self.logs_dir,
+            "pidfile": '%s/uwsgi/uwsgi.pid' % self.run_loc,
+            "buffer-size": '32768',
+            "touch-workers-reload": '%s/uwsgi/worker_reload.file' % self.run_loc,
+            "workers": str(multiprocessing.cpu_count()),
+            "lazy-apps": 'true'
+        }
+        try:
+            virtenv = os.environ['VIRTUAL_ENV']
+            print("INFO: Using python at <%s> for uwsgi service" % virtenv)
+            config['home'] = virtenv
+        except:
+            print("INFO: Using system installed python for uwsgi service")
+
+        for key, value in self.uwsgi_options.items():
+            if key in Uwsgi.__immutable_options__:
+                print("WARNING: uWsgi options<%s> can't be overridden. Ignoring .. ")
+                continue
+            config[key] = value
+
+        conf_list = [str(key) + " = " + str(value) for key, value in config.items()]
+        conf_list.insert(0, "[uwsgi]")
+
+        with open("%s/uwsgi/uwsgi.conf" % self.run_loc, "w") as f:
+            f.write("\n".join(conf_list))
 
     def reload_conf(self):
         self.send_signal(signal.SIGHUP)
@@ -245,8 +263,10 @@ class AppServer():
             config.security_key,
             config.security_block_size,
             config.listen,
-            [config.lib, config.defaultapps, config.webapps, config.adminapps]
+            [config.lib, config.defaultapps, config.webapps, config.adminapps],
+            config.uwsgi_options
         )
+        self.uwsgi.generate_conf_file()
 
         self.nginx = Nginx(
             config.nginx,
