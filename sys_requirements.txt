@@ -1,2 +1,3 @@
 uwsgi
 nginx
+uwsgi-plugin-python3 (or uwsgi-plugin-python if python 3 is the default)
