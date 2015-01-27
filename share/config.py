@@ -31,8 +31,8 @@ webapps = join(share, 'webapps')
 run = join(home, 'run')
 logs = join(home, join('var', 'logs'))
 
-nginx = 'nginx'
-uwsgi = 'uwsgi'
+nginx = '/usr/sbin/nginx'
+uwsgi = '/usr/sbin/uwsgi'
 hostname = 'localhost'
 listen = '127.0.0.1:8080'
 
