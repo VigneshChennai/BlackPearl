@@ -129,7 +129,7 @@ class Configuration:
 
     __config_loc__ = [
         '/etc/blackpearl/config.py',
-        '%s/etc/config/py' % dirname(dirname(realpath(__file__)))
+        '%s/etc/config.py' % dirname(dirname(realpath(__file__)))
 
     ]
 
