@@ -96,9 +96,9 @@ class Uwsgi(Process):
                    '--wsgi-file', self.uwsgi_file,
                    '--enable-threads', '--logto',
                    '%s/uwsgi.log' % self.logs_dir,
-                   '--pidfile', '%s/uwsgi.pid' % self.run_loc,
+                   '--pidfile', '%s/uwsgi/uwsgi.pid' % self.run_loc,
                    '--buffer-size=32768',
-                   '--touch-workers-reload', '%s/uwsgi_worker_reload.file' % self.run_loc,
+                   '--touch-workers-reload', '%s/uwsgi/worker_reload.file' % self.run_loc,
                    '--workers', str(multiprocessing.cpu_count()),
                    '--lazy-apps']
 
@@ -135,7 +135,7 @@ class Nginx(Process):
         self.share_loc = share_loc
         self.logs_loc = logs_loc
 
-        command = [self.nginx_loc, '-c', '{tmp}/nginx.conf'.format(tmp=self.run_loc)]
+        command = [self.nginx_loc, '-c', '{run}/nginx/nginx.conf'.format(run=self.run_loc)]
 
         super().__init__(name="Nginx Service", command=command)
 
@@ -178,8 +178,9 @@ class Nginx(Process):
                     webapp.location))
                 root_location.append(location)
 
-        conf = "\n pid  %s/nginx.pid;" % self.run_loc
+        conf = "\n pid  %s/nginx/nginx.pid;" % self.run_loc
         conf += "\n daemon off;"
+        conf += "\n error_log %s/nginx.error.log  warn;" % self.logs_loc
         conf += "\n worker_processes %s;" % str(multiprocessing.cpu_count())
         conf += "\n\n events {"
         conf += "\n\t worker_connections  1024;"
@@ -190,13 +191,15 @@ class Nginx(Process):
         conf += "\n\t default_type  application/octet-stream;"
         conf += "\n\t sendfile        on;"
         conf += "\n\t keepalive_timeout  65;"
-        conf += "\n\t client_body_temp_path  /tmp/cache 1 2;"
+        conf += "\n\t client_body_temp_path  %s/nginx/cache 1 2;" % self.run_loc
+        conf += "\n\t proxy_temp_path %s/nginx/proxy;" % self.run_loc
+        conf += "\n\t fastcgi_temp_path %s/nginx/fastcgi;" % self.run_loc
+        conf += "\n\t scgi_temp_path %s/nginx/scgi;" % self.run_loc
+        conf += "\n\t uwsgi_temp_path %s/nginx/uwsgi;" % self.run_loc
         conf += """\n\t log_format  main  '$remote_addr - $remote_user """
         conf += """ [$time_local] "$request" '"""
         conf += """\n\t '$status $body_bytes_sent "$http_referer" '"""
         conf += """\n\t '"$http_user_agent" "$http_x_forwarded_for"';"""
-        conf += "\n\t error_log %s/nginx.error.log  warn;" % (
-            self.logs_loc)
         conf += "\n\n\t upstream BlackPearl {"
         conf += "\n\t\t server unix://%s;" % self.socket
         conf += "\n\t }"
@@ -226,7 +229,7 @@ class Nginx(Process):
         conf += "\n\t }"
         conf += "\n }"
 
-        with open("%s/nginx.conf" % self.run_loc, "w") as f:
+        with open("%s/nginx/nginx.conf" % self.run_loc, "w") as f:
             f.write(conf)
 
 
@@ -236,7 +239,7 @@ class AppServer():
         self.uwsgi = Uwsgi(
             config.uwsgi,
             config.home + "/lib/wsgi.py",
-            config.run + "/wsgi.sock",
+            config.run + "/uwsgi/wsgi.sock",
             config.logs,
             config.run,
             config.security_key,
@@ -271,7 +274,7 @@ class AppServer():
         else:
             if not running:
                 webapps_list = analyse_and_pickle_webapps(
-                    "%s/pickle/webapps" % self.config.run,
+                    "%s/uwsgi/pickle/webapps" % self.config.run,
                     self.config.defaultapps,
                     self.config.webapps
                 )
@@ -352,7 +355,7 @@ class AppServer():
     def code_updated(self, webapps_list):
         print("INFO: Code updated.")
         self.nginx.generate_conf_file(webapps_list)
-        with open('%s/uwsgi_worker_reload.file' % self.uwsgi.run_loc, "w") as f:
+        with open('%s/uwsgi/worker_reload.file' % self.uwsgi.run_loc, "w") as f:
             f.write("reload workers")
         self.nginx.reload_conf()
 
@@ -476,7 +479,7 @@ def start(config, daemon=False):
             f.write(str(os.getpid()))
 
         webapps_list = analyse_and_pickle_webapps(
-            "%s/pickle/webapps" % config.run,
+            "%s/uwsgi/pickle/webapps" % config.run,
             config.defaultapps,
             config.adminapps,
             config.webapps

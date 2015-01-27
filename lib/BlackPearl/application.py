@@ -176,7 +176,7 @@ def initialize():
     security.BLOCK_SIZE = int(os.environ['BLACKPEARL_ENCRYPT_BLOCK_SIZE'])
     security.AES_KEY = base64.b64decode(os.environ['BLACKPEARL_ENCRYPT_KEY'])
     testing.listen = os.environ['BLACKPEARL_LISTEN']
-    pfile = open("%s/pickle/webapps" % run, "rb")
+    pfile = open("%s/uwsgi/pickle/webapps" % run, "rb")
     with pfile:
         deployed_webapps = pickle.load(pfile)
 

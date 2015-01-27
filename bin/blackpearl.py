@@ -81,11 +81,13 @@ def start_server(daemon, config):
         shutil.rmtree(config.run)
 
     os.mkdir(config.run)
-    os.mkdir(os.path.join(config.run, 'pickle'))
+    os.mkdir(os.path.join(config.run, 'uwsgi'))
+    os.mkdir(os.path.join(config.run, 'nginx'))
+    os.mkdir(os.path.join(os.path.join(config.run, 'uwsgi'), 'pickle'))
     if not os.access(config.logs, os.F_OK):
         os.makedirs(config.logs)
 
-    open(os.path.join(config.run, "uwsgi_worker_reload.file"), "w").close()
+    open(os.path.join(os.path.join(config.run, 'uwsgi'), "worker_reload.file"), "w").close()
     print("\nStarting BlackPearl server ...")
     print("Generating log files at %s" % config.logs)
     appserver.start(config, daemon)
@@ -184,23 +186,23 @@ if __name__ == "__main__":
 
             try:
                 print("INFO: Initializing server configuration.")
-                config = Configuration()
+                configuration = Configuration()
             except Exception as e:
                 print("SEVERE: %s" % str(e))
                 print("SEVERE: Unexpected error. Stopping the blackpearl server.")
                 sys.exit(1)
             else:
-                start_server(daemon=True, config=config)
+                start_server(daemon=True, config=configuration)
         elif sys.argv[1] == "shutdown":
             try:
                 print("INFO: Fetching server configuration.")
-                config = Configuration()
+                configuration = Configuration()
             except FileNotFoundError or NameError:
                 print("SEVERE: Unexpected error. Unable to stopping the blackpearl server.")
                 print("SEVERE: Exiting...")
                 sys.exit(1)
             else:
-                stop_server(config=config)
+                stop_server(config=configuration)
         else:
             print("Invalid arguments passes. <%s>" % sys.argv[1:])
             usage()
