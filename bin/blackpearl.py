@@ -122,9 +122,10 @@ def stop_server(config):
 
 class Configuration:
     __options__ = [
-        'home', 'share', 'lib', 'webapps', 'adminapps', 'defaultapps', 'run',
+        'home', 'share', 'lib', 'webapps', 'adminapps', 'builtinapps', 'run',
         'logs', 'hostname', 'nginx', 'uwsgi',
-        'listen', 'security_key', 'security_block_size', 'uwsgi_options'
+        'listen', 'security_key', 'security_block_size', 'uwsgi_options',
+        'builtinapps_enabled', 'adminapps_enabled'
     ]
 
     __config_loc__ = [

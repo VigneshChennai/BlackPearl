@@ -25,7 +25,7 @@ share = join(home, 'share')
 
 lib = join(home, 'lib')
 adminapps = join(share, 'adminapps')
-defaultapps = join(share, 'builtinapps')
+builtinapps = join(share, 'builtinapps')
 webapps = join(share, 'webapps')
 
 run = join(home, 'run')
@@ -43,3 +43,6 @@ uwsgi_options = {
     'plugins': 'python',
     'log-truncate': 'true'
 }
+
+builtinapps_enabled = True
+adminapps_enabled = True

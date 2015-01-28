@@ -256,6 +256,15 @@ class Nginx(Process):
 class AppServer():
     def __init__(self, config, webapps_list):
         self.config = config
+        app_loc = [config.webapps]
+
+        if config.adminapps_enabled:
+            app_loc.append(config.adminapps)
+
+        if config.builtinapps_enabled:
+            app_loc.append(config.builtinapps)
+
+        self.app_loc = app_loc
         self.uwsgi = Uwsgi(
             config.uwsgi,
             config.home + "/lib/wsgi.py",
@@ -265,7 +274,7 @@ class AppServer():
             config.security_key,
             config.security_block_size,
             config.listen,
-            [config.lib, config.defaultapps, config.webapps, config.adminapps],
+            [config.lib] + app_loc,
             config.uwsgi_options
         )
         self.uwsgi.generate_conf_file()
@@ -297,8 +306,7 @@ class AppServer():
             if not running:
                 webapps_list = analyse_and_pickle_webapps(
                     "%s/uwsgi/pickle/webapps" % self.config.run,
-                    self.config.defaultapps,
-                    self.config.webapps
+                    *self.app_loc
                 )
                 self.afm.update_watch_path(rec=True)
                 if not webapps_list:
@@ -317,14 +325,8 @@ class AppServer():
                 ev_loop.call_later(1, self._reload_code)
 
     def _init_code_update_monitor(self):
-        paths = [
-            self.config.defaultapps,
-            self.config.webapps
-        ]
-        excl = pyinotify.ExcludeFilter([
-            self.config.defaultapps + "/*/static",
-            self.config.webapps + "/*/static"
-        ])
+        paths = self.app_loc
+        excl = pyinotify.ExcludeFilter([al + "/*/static" for al in self.app_loc])
         self.afm = fileutils.AsyncFileMonitor(self._file_modified_callback)
         self.afm.set_watch_path(paths, rec=True, exclude_filter=excl)
 
@@ -500,11 +502,17 @@ def start(config, daemon=False):
         with open(config.run + "/BlackPearl.pid", "w") as f:
             f.write(str(os.getpid()))
 
+        app_loc = [config.webapps]
+
+        if config.adminapps_enabled:
+            app_loc.append(config.adminapps)
+
+        if config.builtinapps_enabled:
+            app_loc.append(config.builtinapps)
+
         webapps_list = analyse_and_pickle_webapps(
             "%s/uwsgi/pickle/webapps" % config.run,
-            config.defaultapps,
-            config.adminapps,
-            config.webapps
+            *app_loc
         )
         if not webapps_list:
             print("SEVERE: No application deployed.")
