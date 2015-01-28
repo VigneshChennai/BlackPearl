@@ -130,6 +130,13 @@ class Webapp:
     def _init_basics(self, config):
         """Basic details about the webapp is initialized using this function"""
         try:
+            if not config.enabled:
+                raise NotEnabledError("Webapp is configured as disabled")
+            else:
+                self.enabled = True
+        except AttributeError:
+            self.enabled = True
+        try:
             self.name = config.name
         except AttributeError:
             self.name = self.folder_name
@@ -279,6 +286,10 @@ class Webapp:
                             self.webmodules[url] = webmodule
 
 
+class NotEnabledError(Exception):
+    pass
+
+
 def initialize(location):
     """Initializes the web applications"""
     if not os.access(location, os.F_OK):
@@ -299,6 +310,8 @@ def initialize(location):
                 webapps.append(webapp)
             else:
                 print("SEVERE: Ignoring the webapp")
+        except NotEnabledError:
+            print("INFO: Ignoring <%s> as is it disabled in configuration file")
         except:
             traceback.print_exc()
             print("Error initializing : %s" % webapp_folder)
