@@ -58,9 +58,9 @@ class Color:
 def usage():
     print("""Usage:
 
-Syntax: blackpearl.py <option>
+Syntax: blackpearl.py [-c config_path] <action>
 
-Options:
+Actions:
     1. startup
     2. shutdown""")
 
@@ -138,7 +138,7 @@ class Configuration:
         '%s/share/config.py' % dirname(dirname(realpath(__file__)))
     ]
 
-    def __init__(self):
+    def __init__(self, config=None):
         default_config_loc = None
         for loc in Configuration.__default_config_loc__:
             if os.access(loc, os.F_OK):
@@ -156,10 +156,16 @@ class Configuration:
             exec(file.read(), l, g)
 
         config_loc = None
-        for loc in Configuration.__config_loc__:
-            if os.access(loc, os.F_OK):
-                config_loc = loc
-                break
+        if config:
+            if os.access(config, os.F_OK):
+                config_loc = config
+            else:
+                raise FileNotFoundError("Specified configuration file not found: <%s>" % config)
+        else:
+            for loc in Configuration.__config_loc__:
+                if os.access(loc, os.F_OK):
+                    config_loc = loc
+                    break
         if config_loc:
             print("INFO: Using configuration file at <%s>" % config_loc)
             g['__file__'] = config_loc
@@ -176,9 +182,128 @@ class Configuration:
                 raise NameError("Option <%s> not defined in the configuration file")
 
 
+# used from https://gist.github.com/VigneshChennai/a79e84df57505d88c5b9
+class ArgumentParserRules:
+
+    def __init__(self, with_arguments, without_arguments,
+                 should_not_be_with={}, should_be_with={},
+                 with_repetitions={}, mandatory=[]):
+        self.with_arguments = with_arguments
+        self.without_arguments = without_arguments
+        self.should_not_be_with = should_not_be_with
+        self.should_be_with = should_be_with
+        self.with_repetitions = with_repetitions
+        self.mandatory = mandatory
+
+
+class ArgumentParserError(Exception):
+    pass
+
+
+class ArgumentParser:
+
+    def __init__(self, rules, arguments):
+        self.rules = rules
+        self.arguments = arguments
+
+    def parse(self):
+        args = {}
+        i = 0
+        arg_len = len(self.arguments)
+        while i < arg_len:
+            if self.arguments[i] in self.rules.with_arguments:
+                try:
+                    if self.arguments[i] in self.rules.with_repetitions:
+                        try:
+                            args[self.arguments[i]].append(self.arguments[i + 1])
+                        except KeyError:
+                            args[self.arguments[i]] = [(self.arguments[i + 1])]
+
+                    else:
+                        if self.arguments[i] in args:
+                            raise ArgumentParserError("Option <%s> specified more than once." % self.arguments[i])
+                        else:
+                            args[self.arguments[i]] = self.arguments[i + 1]
+                    i += 2
+                    continue
+                except IndexError:
+                    raise ArgumentParserError("Option <%s> requires an argument."
+                                              " but none specified." % self.arguments[i]) from None
+
+            elif self.arguments[i] in self.rules.without_arguments:
+                if self.arguments[i] in args:
+                    raise ArgumentParserError("Option <%s> specified more than once." % self.arguments[i])
+                else:
+                    args[self.arguments[i]] = None
+
+            else:
+                raise ArgumentParserError("Invalid Option <%s>." % self.arguments[i])
+            i += 1
+
+        for arg in args.keys():
+            try:
+                options = self.rules.should_not_be_with[arg]
+            except KeyError:
+                pass
+            else:
+                if isinstance(options, str):
+                    options = [options]
+                for option in options:
+                    if option in args:
+                        raise ArgumentParserError("Option <%s> should not be used "
+                                                  "along with <%s> options" % (arg, str(options)))
+
+            try:
+                options = self.rules.should_be_with[arg]
+            except KeyError:
+                pass
+            else:
+                if isinstance(options, str):
+                    options = [options]
+                for option in options:
+                    if option not in args:
+                        raise ArgumentParserError("Option <%s> should be used along "
+                                                  "with <%s> options" % (arg, str(options)))
+
+        for arg in self.rules.mandatory:
+            if isinstance(arg, str):
+                if arg not in args:
+                    raise ArgumentParserError("Option <%s> should be specified." % arg)
+            else:
+                not_found = True
+                for opt in arg:
+                    if opt in args:
+                        not_found = False
+                        break
+                if not_found:
+                    raise ArgumentParserError("One of the options <%s> should be specified." % str(arg))
+        return args
+
+
 if __name__ == "__main__":
-    if len(sys.argv) == 2:
-        if sys.argv[1] == "startup":
+    try:
+        apr = ArgumentParserRules(
+            with_arguments=['-c'],
+            without_arguments=['startup', 'shutdown'],
+            should_not_be_with={
+                'startup': ['shutdown'],
+                'shutdown': ['startup']
+            },
+            mandatory=[('startup', 'shutdown')]
+        )
+        ap = ArgumentParser(apr, sys.argv[1:])
+        p_args = ap.parse()
+    except ArgumentParserError as e:
+        print("ERROR: %s" % str(e))
+        usage()
+        print("ERROR: Exiting ...")
+        sys.exit(1)
+    except:
+        print("SEVERE: Unexpected error occurred.")
+        print("SEVERE: %s" % traceback.format_exc())
+        sys.exit(1)
+    else:
+        if "startup" in p_args:
             print(Color.BOLD + '\nBlackPearl' + Color.END)
             print(startup_notes)
             print(Color.BOLD + 'Author' + Color.END)
@@ -186,26 +311,31 @@ if __name__ == "__main__":
 
             try:
                 print("INFO: Initializing server configuration.")
-                configuration = Configuration()
+                try:
+                    config_path = p_args['-c']
+                except:
+                    configuration = Configuration()
+                else:
+                    configuration = Configuration(config=config_path)
             except Exception as e:
                 print("SEVERE: %s" % str(e))
-                print("SEVERE: Unexpected error. Stopping the blackpearl server.")
+                print("SEVERE: Error occurred. Stopping the blackpearl server.")
                 sys.exit(1)
             else:
                 start_server(daemon=True, config=configuration)
-        elif sys.argv[1] == "shutdown":
+        elif "shutdown" in p_args:
             try:
                 print("INFO: Fetching server configuration.")
-                configuration = Configuration()
-            except FileNotFoundError or NameError:
-                print("SEVERE: Unexpected error. Unable to stopping the blackpearl server.")
+                try:
+                    config_path = p_args['-c']
+                except:
+                    configuration = Configuration()
+                else:
+                    configuration = Configuration(config=config_path)
+            except (FileNotFoundError, NameError) as e:
+                print("SEVERE: %s" % str(e))
+                print("SEVERE: Error occurred. Unable to stopping the blackpearl server.")
                 print("SEVERE: Exiting...")
                 sys.exit(1)
             else:
                 stop_server(config=configuration)
-        else:
-            print("Invalid arguments passes. <%s>" % sys.argv[1:])
-            usage()
-    else:
-        print("Invalid arguments passes. <%s>" % sys.argv[1:])
-        usage()
