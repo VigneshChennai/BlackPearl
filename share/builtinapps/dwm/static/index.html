@@ -102,13 +102,14 @@
 
     </script>
     <script id="testset-tmpl" type="x-tmpl-mustache">
+
 		<div class="col-md-4 column testset">
 			<div class="panel panel-default">
 			    <div class="panel-heading">
 			        <table class="fullwidth">
 			            <tr>
 			                <td><a class="panel-title">{{name}}</a></td>
-			                <td><button class="testset_btn pull-right btn btn-primary" onclick="execute_testset('{{name}}')">Execute</button></td>
+			                <td><button class="testset_btn pull-right btn btn-primary execute_btn" onclick="execute_testset('{{name}}')">Execute</button></td>
 			            </tr>
                     </table>
 			    </div>
@@ -249,7 +250,7 @@
                                                                             <td class="fullsize" valign="centre"
                                                                                 align="center">
                                                                                 <button type="button"
-                                                                                        class="btn btn-primary invoke_btn"
+                                                                                        class="btn btn-primary invoke_btn execute_btn"
                                                                                         onclick="invoke()">Invoke
                                                                                 </button>
                                                                             </td>
@@ -266,6 +267,9 @@
                                             <div class="row clearfix">
                                                 <div class="col-md-12 column">
                                                     <div class="panel panel-default no-border-top">
+                                                        <div class="panel-heading height45">
+                                                              <button class="testset_btn pull-right btn btn-primary execute_btn" onclick="execute_testset()">Execute All</button>
+                                                        </div>
                                                         <div id="testsets-container" class="panel-body no-border-top">
                                                             <div class="col-md-4 column" style="visibility: hidden">
                                                                 <div class="progress">

@@ -299,11 +299,11 @@ class AppServer():
         try:
             running = self.isrunning()
         except NotStartedYet:
-            pass
+            print("INFO: Server not started yet. Ignoring restart request.")
         except NotRestartedYet:
-            pass
+            print("INFO: Server not restarted yet. Ignoring another restart request.")
         else:
-            if not running:
+            if running:
                 webapps_list = analyse_and_pickle_webapps(
                     "%s/uwsgi/pickle/webapps" % self.config.run,
                     *self.app_loc
@@ -325,6 +325,7 @@ class AppServer():
                 ev_loop.call_later(1, self._reload_code)
 
     def _init_code_update_monitor(self):
+        print("INFO: Watching <%s> paths for file modifications." % str(self.app_loc))
         paths = self.app_loc
         excl = pyinotify.ExcludeFilter([al + "/*/static" for al in self.app_loc])
         self.afm = fileutils.AsyncFileMonitor(self._file_modified_callback)

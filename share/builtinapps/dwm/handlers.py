@@ -147,6 +147,26 @@ def run_testset(url, name):
         raise RequestInvalid("The name <%s> not found" % name)
 
 
+@weblocation('/testing/run_all')
+def run_all_testset(url):
+    try:
+        webapp = application.modules[url]
+    except:
+        raise RequestInvalid("The URL <%s> not found" % url)
+
+    ret = []
+    try:
+        _testsets = webapp.testsets[url]
+    except KeyError:
+        raise RequestInvalid("No testsets found for url <%s>" % url)
+    for testset in _testsets:
+        ret.append({
+            "TestSet": testset['name'],
+            "data": testset['func']()
+        })
+    return ret
+
+
 @weblocation("/testing/servertesting")
 class Session:
     @webname("sessiontest")

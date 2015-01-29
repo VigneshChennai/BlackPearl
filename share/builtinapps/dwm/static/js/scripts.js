@@ -235,6 +235,8 @@ function generate_form_elements(args) {
 
 function invoke() {
     output_tmpl = $("#output-tmpl").html();
+    $(".execute_btn").prop( "disabled", true );
+    $("#output-box").html('<pre style="min-height:200px"><div class="spinner"> <div class="bounce1"></div> <div class="bounce2"></div> <div class="bounce3"></div> </div></pre>');
     $.post( _current_module, $('#invoke-form').serialize(), function(data) {
 
          if(data.status == 0) {
@@ -246,9 +248,12 @@ function invoke() {
          }
          var rendered = Mustache.render(output_tmpl, {"output" :JSON.stringify(data, null, 4)});
          $("#output-box").html(rendered);
+        $(".execute_btn").prop( "disabled", false);
        },
        'json' // I expect a JSON response
-    );
+    ).always(function() {
+            $(".execute_btn").prop( "disabled", false);
+        });
 }
 
 function display_handlers() {
@@ -280,8 +285,23 @@ function display_posthandlers() {
 }
 
 function execute_testset(testset) {
-    output_tmpl = $("#output-tmpl").html();
-    $.get("/dwm/testing/run?url=" + _current_module +"&name=" + testset, function(data) {
+    var output_tmpl = $("#output-tmpl").html();
+
+    var url = "";
+    $(".execute_btn").prop( "disabled", true );
+    $("#output-box").html('<pre style="min-height:200px"><div class="spinner"> ' +
+    '<div class="spinner-container container1"> <div class="circle1"></div> <div class="circle2"></div> ' +
+    '<div class="circle3"></div> <div class="circle4"></div> </div> <div class="spinner-container container2"> ' +
+    '<div class="circle1"></div> <div class="circle2"></div> <div class="circle3"></div> <div class="circle4"></div> ' +
+    '</div> <div class="spinner-container container3"> <div class="circle1"></div> <div class="circle2"></div> ' +
+    '<div class="circle3"></div> <div class="circle4"></div> </div></div></pre>');
+    if (testset) {
+        url = "/dwm/testing/run?url=" + _current_module +"&name=" + testset;
+    } else {
+        url = "/dwm/testing/run_all?url=" + _current_module;
+    }
+
+    $.get(url, function(data) {
 
          if(data.status == 0) {
             $("#output-panel").removeClass();
@@ -294,7 +314,9 @@ function execute_testset(testset) {
          $("#output-box").html(rendered);
        },
        'json' // I expect a JSON response
-    );
+    ).always(function() {
+            $(".execute_btn").prop( "disabled", false);
+        });
 }
 function form_option_cb(object, id, id_view) {
     $('#'+id).val($(object).html());
