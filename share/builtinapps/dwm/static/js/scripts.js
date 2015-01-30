@@ -191,7 +191,9 @@ function load_testsets(testsets) {
              rendered += Mustache.render(tmpl, testsets[i]);
         }
         $("#testsets-container").html(rendered);
+        $("#testcase-execute-all-btn").prop( "disabled", false);
     } else {
+        $("#testcase-execute-all-btn").prop( "disabled", true);
         $("#testsets-container").html("No testsets defined");
     }
 }
