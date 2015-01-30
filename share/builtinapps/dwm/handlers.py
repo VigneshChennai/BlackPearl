@@ -45,8 +45,11 @@ def applications():
     ret = []
     for app in application.deployed_webapps:
         urls = [url for url in app.webmodules.keys()]
+        urls.sort()
         preprocessors = [preprocessor['name'] for preprocessor in app.preprocessors]
+        preprocessors.sort(key=lambda prep: prep['name'])
         posthandlers = [posthandler['name'] for posthandler in app.posthandlers]
+        posthandlers.sort(key=lambda post: post['name'])
         ret.append({
             "name": app.name,
             "description": app.desc,
@@ -55,7 +58,7 @@ def applications():
             "posthandlers": posthandlers,
             "handlers": app.handlers
         })
-
+        ret = sorted(ret, key=lambda data: data['name'])
     return ret
 
 
