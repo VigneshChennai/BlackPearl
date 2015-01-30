@@ -2,18 +2,18 @@
 
 # This file is part of BlackPearl.
 
-#BlackPearl is free software: you can redistribute it and/or modify
-#it under the terms of the GNU General Public License as published by
-#the Free Software Foundation, either version 3 of the License, or
-#(at your option) any later version.
+# BlackPearl is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 
-#BlackPearl is distributed in the hope that it will be useful,
-#but WITHOUT ANY WARRANTY; without even the implied warranty of
-#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#GNU General Public License for more details.
+# BlackPearl is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 
-#You should have received a copy of the GNU General Public License
-#along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
+# You should have received a copy of the GNU General Public License
+# along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
 
@@ -30,6 +30,8 @@ class AsyncFileMonitor(pyinotify.Notifier):
             self.loop = asyncio.get_event_loop()
         self.loop.add_reader(self._fd, self._events_ready)
         self.wdd = None
+        self.path = None
+        self.exclude_filter = None
 
     def set_watch_path(self, path, rec=False, exclude_filter=pyinotify.ExcludeFilter([])):
         if not self.wdd:
@@ -49,7 +51,6 @@ class AsyncFileMonitor(pyinotify.Notifier):
     def _events_ready(self):
         self.read_events()
         self.process_events()
-
 
     def stop(self):
         self.loop.remove_reader(self._fd)

@@ -455,8 +455,13 @@ class AppServer():
 
 def start(config, daemon=False):
     print("Performing precheck .... ", end="")
-    if not precheck():
-        print("[Failed]\nNode not started ....")
+    try:
+        prechecks.check_all()
+    except Exception as e:
+        print("[Failed]")
+        print("SEVERE: %s" % str(e))
+        print("BlackPearl server not started ....")
+
         sys.exit(-1)
     else:
         print("[Ok]")
