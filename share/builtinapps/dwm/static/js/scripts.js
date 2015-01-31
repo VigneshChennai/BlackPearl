@@ -237,8 +237,14 @@ function generate_form_elements(args) {
 
 function invoke() {
     output_tmpl = $("#output-tmpl").html();
+    var execute_all = $("#testcase-execute-all-btn").prop( "disabled");
     $(".execute_btn").prop( "disabled", true );
-    $("#output-box").html('<pre style="min-height:200px"><div class="spinner"> <div class="bounce1"></div> <div class="bounce2"></div> <div class="bounce3"></div> </div></pre>');
+    $("#output-box").html('<pre style="min-height:200px"><div class="spinner"> ' +
+    '<div class="spinner-container container1"> <div class="circle1"></div> <div class="circle2"></div> ' +
+    '<div class="circle3"></div> <div class="circle4"></div> </div> <div class="spinner-container container2"> ' +
+    '<div class="circle1"></div> <div class="circle2"></div> <div class="circle3"></div> <div class="circle4"></div> ' +
+    '</div> <div class="spinner-container container3"> <div class="circle1"></div> <div class="circle2"></div> ' +
+    '<div class="circle3"></div> <div class="circle4"></div> </div></div></pre>');
     $.post( _current_module, $('#invoke-form').serialize(), function(data) {
 
          if(data.status == 0) {
@@ -255,6 +261,7 @@ function invoke() {
        'json' // I expect a JSON response
     ).always(function() {
             $(".execute_btn").prop( "disabled", false);
+            $("#testcase-execute-all-btn").prop( "disabled", execute_all);
         });
 }
 
@@ -290,6 +297,7 @@ function execute_testset(testset) {
     var output_tmpl = $("#output-tmpl").html();
 
     var url = "";
+    var execute_all = $("#testcase-execute-all-btn").prop( "disabled");
     $(".execute_btn").prop( "disabled", true );
     $("#output-box").html('<pre style="min-height:200px"><div class="spinner"> ' +
     '<div class="spinner-container container1"> <div class="circle1"></div> <div class="circle2"></div> ' +
@@ -318,6 +326,7 @@ function execute_testset(testset) {
        'json' // I expect a JSON response
     ).always(function() {
             $(".execute_btn").prop( "disabled", false);
+            $("#testcase-execute-all-btn").prop( "disabled", execute_all);
         });
 }
 function form_option_cb(object, id, id_view) {
