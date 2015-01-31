@@ -159,14 +159,20 @@ class Webapp:
             self.session_enabled = None
 
         try:
-            if config.url_prefix == "ROOT":
-                self.url_prefix = ""
-            elif self.url_prefix == "":
+            if len(self.url_prefix) == 0:
                 print("WARNING: Webapp<%s> - Empty url_prefix is set in the"
                       " configuration file" % self.name)
+                print("WARNING: Using folder name </%s> as url_prefix for this webapp." % self.folder_name)
                 self.url_prefix = self.folder_name
             else:
-                self.url_prefix = config.url_prefix
+                if self.url_prefix.startswith('/'):
+                    self.url_prefix = config.url_prefix
+                else:
+                    print("WARNING: url_prefix is not defined with '/' in the "
+                          "beginning. but defined as <%s>" % self.url_prefix)
+                    print("WARNING: Adding '/' in front in URL prefix.")
+                    self.url_prefix = '/' + config.url_prefix
+            print("INFO: URL prefix <%s>" % self.url_prefix)
         except AttributeError:
             self.url_prefix = self.folder_name
 
@@ -255,7 +261,7 @@ class Webapp:
                         if self._check_url(url, name, member):
                             self.webmodules[url] = member.__webmodule__
                     else:
-                        url = "/" + self.url_prefix + utils.fixurl(member.__webmodule__['url'])
+                        url = self.url_prefix + utils.fixurl(member.__webmodule__['url'])
                         if self._check_url(url, name, member):
                             self.webmodules[url] = member.__webmodule__
                 elif hasattr(member, "__preprocessor__"):
@@ -281,7 +287,7 @@ class Webapp:
                         if self._check_url(url, name, member):
                             self.webmodules[url] = webmodule
                     else:
-                        url = "/" + self.url_prefix + utils.fixurl(webmodule['url'])
+                        url = self.url_prefix + utils.fixurl(webmodule['url'])
                         if self._check_url(url, name, member):
                             self.webmodules[url] = webmodule
 
