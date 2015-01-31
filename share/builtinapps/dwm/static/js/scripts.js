@@ -68,7 +68,7 @@ _current_app_id = 0;
 
 function initialize_applications(callback) {
     ret = {}
-    $.getJSON("/dwm/applications", function (data){
+    $.getJSON("applications", function (data){
         status = data.status;
 
         if(status == 0) {
@@ -170,7 +170,7 @@ function openmodule(url, object) {
 
 function load_signature(url) {
     //$("#module-details-selected").html(url);
-    $.getJSON("/dwm/signature?url=" + url , function (data){
+    $.getJSON("signature?url=" + url , function (data){
             if (data.data.desc) {
                 $("#description-module").html(data.data.desc)
             } else {
@@ -306,9 +306,9 @@ function execute_testset(testset) {
     '</div> <div class="spinner-container container3"> <div class="circle1"></div> <div class="circle2"></div> ' +
     '<div class="circle3"></div> <div class="circle4"></div> </div></div></pre>');
     if (testset) {
-        url = "/dwm/testing/run?url=" + _current_module +"&name=" + testset;
+        url = "testing/run?url=" + _current_module +"&name=" + testset;
     } else {
-        url = "/dwm/testing/run_all?url=" + _current_module;
+        url = "testing/run_all?url=" + _current_module;
     }
 
     $.get(url, function(data) {
