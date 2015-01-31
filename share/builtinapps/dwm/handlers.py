@@ -23,23 +23,6 @@ from BlackPearl.core.exceptions import RequestInvalid
 from BlackPearl.core import datatype
 
 
-@weblocation('/trial/')
-class Trial:
-    @webname('/dummy')
-    def funny(self, name: datatype.Format("^[a-zA-Z ,.'-]+$"),
-              sex: datatype.Options("Male", "Female", "Other"),
-              age: datatype.Integer()):
-        return name, sex, age
-
-    def __call__(self, s):
-        try:
-            value = self.session.name
-        except:
-            value = "Not set yet"
-        self.session.name = s
-        return "Old value : " + value
-
-
 @weblocation('/applications')
 def applications():
     ret = []
