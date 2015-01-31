@@ -21,6 +21,7 @@ import shutil
 import pwd
 import traceback
 import signal
+import time
 
 from BlackPearl.server import appserver
 from os.path import dirname, realpath
@@ -97,7 +98,8 @@ def stop_server(config):
     print("Stopping BlackPearl services in localhost "
           "running on <%s> user account" % pwd.getpwuid(os.getuid())[0])
     if os.access(config.run, os.F_OK):
-        print("Trying to stop BlackPearl service ...", end="")
+        print("Trying to stop BlackPearl service .", end="")
+        sys.stdout.flush()
         try:
             with open(os.path.join(config.run, "BlackPearl.pid")) as f:
                 pid = f.read()
@@ -112,9 +114,19 @@ def stop_server(config):
                 print(" [Failed] Unable to stop BlackPearl service. May be it is already stopped.")
                 return
             else:
-
-                print(" [Stopped]")
+                try:
+                    count = 0
+                    while count < 15:
+                        print(".", end="")
+                        sys.stdout.flush()
+                        os.kill(int(pid), 0)
+                        time.sleep(1)
+                        count += 1
+                    print("[Failed]")
+                except:
+                    print("[Stopped]")
                 return
+
     else:
         print("BlackPearl service is not running.")
         return
