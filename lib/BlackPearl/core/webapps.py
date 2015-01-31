@@ -172,9 +172,11 @@ class Webapp:
                           "beginning. but defined as <%s>" % self.url_prefix)
                     print("WARNING: Adding '/' in front in URL prefix.")
                     self.url_prefix = '/' + config.url_prefix
-            print("INFO: URL prefix <%s>" % self.url_prefix)
+
         except AttributeError:
-            self.url_prefix = self.folder_name
+            self.url_prefix = "/" + self.folder_name
+
+        print("INFO: URL prefix <%s>" % self.url_prefix)
 
         try:
             self.defined_posthandlers = config.posthandlers
@@ -233,7 +235,7 @@ class Webapp:
                     except:
                         self.testsets[webmodule] = [testset]
                 else:
-                    webmodule = "/" + self.url_prefix + testset['webmodule']
+                    webmodule = self.url_prefix + testset['webmodule']
                     try:
                         self.testsets[webmodule].append(testset)
                     except:
@@ -307,7 +309,7 @@ def initialize(location):
 
     webapps_folder = [name for name in os.listdir(location)
                       if os.path.isdir(location + os.path.sep + name)]
-    print("Webapps folder: " + str(webapps_folder))
+    print("INFO: List of webapps folder present in the given path <%s>." + str(webapps_folder))
     webapps = []
     for webapp_folder in webapps_folder:
         try:

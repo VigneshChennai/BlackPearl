@@ -177,13 +177,13 @@ class Nginx(Process):
 
         for webapp in webapps_list:
             location = Location()
-            if len(webapp.url_prefix) > 0:
-                location.path = '/%s/(.+\..+)' % webapp.url_prefix
+            if len(webapp.url_prefix) > 1:
+                location.path = '%s/(.+\..+)' % webapp.url_prefix
                 location.add_value('alias', '%s/static/$1' % (
                     webapp.location))
                 locations.append(location)
                 location = Location()
-                location.path = '/%s(.*/$)' % webapp.url_prefix
+                location.path = '%s(.*/$)' % webapp.url_prefix
                 location.add_value('alias', '%s/static$1' % (
                     webapp.location))
                 locations.append(location)
