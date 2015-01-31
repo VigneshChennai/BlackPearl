@@ -49,3 +49,220 @@ def session_value_check():
         old_value = val
 
     print("All testcase completed successfully")
+
+
+@testset(name="Integer parameter test - correct values", webmodule="/testing/servertesting/integerparamtest")
+def testing1():
+    for i in range(0, 1000):
+        result = testcase({
+            "value": str(i)
+        })
+        test(result['status'], 0)
+
+
+@testset(name="Integer parameter test - Incorrect values", webmodule="/testing/servertesting/integerparamtest")
+def testing2():
+    print("Testing: String value to integer")
+    for i in range(0, 1000):
+        result = testcase({
+            "value": str(i) + "sd"
+        })
+        test(result['status'], -201)
+    print("'String value to integer' test completed successfully")
+    print("Testing: Floating value to Integer")
+    for i in range(0, 1000):
+        result = testcase({
+            "value": str(i) + ".01"
+        })
+        test(result['status'], -201)
+
+    print("'Floating value to Integer' test completed successfully")
+
+
+@testset(name="Float parameter test - correct values", webmodule="/testing/servertesting/floatparamtest")
+def testing3():
+    print("Testing with integer values")
+    for i in range(0, 1000):
+        result = testcase({
+            "value": str(i)
+        })
+        test(result['status'], 0)
+
+    print("Testing with float values")
+    for i in range(0, 1000):
+        result = testcase({
+            "value": str(i) + ".34"
+        })
+        test(result['status'], 0)
+
+
+@testset(name="Float parameter test - Incorrect values", webmodule="/testing/servertesting/floatparamtest")
+def testing4():
+    print("Testing: String value to Float")
+    for i in range(0, 1000):
+        result = testcase({
+            "value": str(i) + "sd"
+        })
+        test(result['status'], -201)
+    print("'String value to float' test completed successfully")
+
+
+@testset(name="Option parameter test - correct values", webmodule="/testing/servertesting/optionparamtest")
+def testing5():
+    result = testcase({
+        "value": "Male"
+    })
+    test(result['status'], 0)
+
+    result = testcase({
+        "value": "Female"
+    })
+    test(result['status'], 0)
+
+
+@testset(name="Option parameter test - Incorrect values", webmodule="/testing/servertesting/optionparamtest")
+def testing6():
+    result = testcase({
+        "value": "male"
+    })
+    test(result['status'], -201)
+
+    result = testcase({
+        "value": "female"
+    })
+    test(result['status'], -201)
+
+
+@testset(name="Format parameter test - correct values", webmodule="/testing/servertesting/formatparamtest")
+def testing7():
+    result = testcase({
+        "value": "Vigneshwaran P"
+    })
+    test(result['status'], 0)
+
+    result = testcase({
+        "value": "Iron Man"
+    })
+    test(result['status'], 0)
+
+
+@testset(name="Format parameter test - Incorrect values", webmodule="/testing/servertesting/formatparamtest")
+def testing8():
+    result = testcase({
+        "value": "Iron Man 3"
+    })
+    test(result['status'], -201)
+
+    result = testcase({
+        "value": "007"
+    })
+    test(result['status'], -201)
+
+
+@testset(name="Integer list parameter test - correct values", webmodule="/testing/servertesting/integerlistparamtest")
+def testing_list1():
+    for i in range(0, 1000):
+        result = testcase({
+            "value": [i, i + 12]
+        })
+        test(result['status'], 0)
+        print("Data : %s" % result['data'])
+
+
+@testset(name="Integer list parameter test - Incorrect values", webmodule="/testing/servertesting/integerlistparamtest")
+def testing_list2():
+    print("Testing: String value to integer")
+    for i in range(0, 1000):
+        result = testcase({
+            "value": [str(i) + "sd", i]
+        })
+        test(result['status'], -201)
+    print("'String value to integer' test completed successfully")
+    print("Testing: Floating value to Integer")
+    for i in range(0, 1000):
+        result = testcase({
+            "value": [str(i) + ".01", i]
+        })
+        test(result['status'], -201)
+
+    print("'Floating value to Integer' test completed successfully")
+
+
+@testset(name="Float list parameter test - correct values", webmodule="/testing/servertesting/floatlistparamtest")
+def testing_list3():
+    print("Testing with integer values")
+    for i in range(0, 1000):
+        result = testcase({
+            "value": [i, i+1]
+        })
+        test(result['status'], 0)
+
+    print("Testing with float values")
+    for i in range(0, 1000):
+        result = testcase({
+            "value": [str(i) + ".34", i]
+        })
+        test(result['status'], 0)
+
+
+@testset(name="Float list parameter test - Incorrect values", webmodule="/testing/servertesting/floatlistparamtest")
+def testing_list4():
+    print("Testing: String value to Float")
+    for i in range(0, 1000):
+        result = testcase({
+            "value": [str(i) + "sd", "sdf"]
+        })
+        test(result['status'], -201)
+    print("'String value to float' test completed successfully")
+
+
+@testset(name="Option list parameter test - correct values", webmodule="/testing/servertesting/optionlistparamtest")
+def testing_list5():
+    result = testcase({
+        "value": ["Male", "Female"]
+    })
+    test(result['status'], 0)
+
+    result = testcase({
+        "value": ["Female", "Male"]
+    })
+    test(result['status'], 0)
+
+
+@testset(name="Option list parameter test - Incorrect values", webmodule="/testing/servertesting/optionlistparamtest")
+def testing_list6():
+    result = testcase({
+        "value": ["male", "Male"]
+    })
+    test(result['status'], -201)
+
+    result = testcase({
+        "value": ["female", "male"]
+    })
+    test(result['status'], -201)
+
+
+@testset(name="Format list parameter test - correct values", webmodule="/testing/servertesting/formatlistparamtest")
+def testing_list7():
+    result = testcase({
+        "value": ["Vigneshwaran P", "P Vigneshwaran"]
+    })
+    test(result['status'], 0)
+
+    result = testcase({
+        "value": ["Iron Man", "Man Iron"]
+    })
+    test(result['status'], 0)
+
+
+@testset(name="Format list parameter test - Incorrect values", webmodule="/testing/servertesting/formatlistparamtest")
+def testing_list8():
+    result = testcase({
+        "value": ["Iron Man 3", "Iron Man 4"]
+    })
+    test(result['status'], -201)
+
+    result = testcase({
+        "value": ["007", "234"]
+    })
+    test(result['status'], -201)

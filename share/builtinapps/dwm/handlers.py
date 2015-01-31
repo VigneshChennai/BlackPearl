@@ -183,7 +183,7 @@ class Session:
 
         return ret
 
-    @webname("intergerparamtest")
+    @webname("integerparamtest")
     def intergerparamtest(self, value: datatype.Integer()):
         return "Valid data <%s>" % value
 
@@ -197,4 +197,20 @@ class Session:
 
     @webname("formatparamtest")
     def formatparamtest(self, value: datatype.Format("^[a-zA-Z ,.'-]+$")):
+        return "Valid data <%s>" % value
+
+    @webname("integerlistparamtest")
+    def integerlistparamtest(self, value: datatype.IntegerList()):
+        return "Valid data <%s>" % value
+
+    @webname("floatlistparamtest")
+    def floatlistparamtest(self, value: datatype.FloatList()):
+        return "Valid data <%s>" % value
+
+    @webname("optionlistparamtest")
+    def optionlistparamtest(self, value: datatype.OptionsList("Male", "Female")):
+        return "Valid data <%s>" % value
+
+    @webname("formatlistparamtest")
+    def formatlistparamtest(self, value: datatype.FormatList("^[a-zA-Z ,.'-]+$")):
         return "Valid data <%s>" % value

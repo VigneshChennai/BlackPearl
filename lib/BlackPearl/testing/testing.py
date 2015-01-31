@@ -2,29 +2,26 @@
 
 # This file is part of BlackPearl.
 
-#BlackPearl is free software: you can redistribute it and/or modify
-#it under the terms of the GNU General Public License as published by
-#the Free Software Foundation, either version 3 of the License, or
-#(at your option) any later version.
+# BlackPearl is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 
-#BlackPearl is distributed in the hope that it will be useful,
-#but WITHOUT ANY WARRANTY; without even the implied warranty of
-#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#GNU General Public License for more details.
+# BlackPearl is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 
-#You should have received a copy of the GNU General Public License
-#along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
+# You should have received a copy of the GNU General Public License
+# along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
+
 
 import json
 import inspect
 import traceback
-import builtins
 from time import strftime
-from http.cookiejar import CookieJar
 import urllib.request
 import urllib.parse
-
-import os
 
 
 __all__ = ['testset', 'testcase', 'test', 'TestcaseFailed',
@@ -41,14 +38,13 @@ class TestsetInvoker:
         self.webmodule = webmodule
 
     def __call__(self):
+        # The below three variable will used for inspection from testcase
         caller = self.__call__
         webmodule = self.webmodule
         opener = urllib.request.build_opener(
             urllib.request.HTTPCookieProcessor())
 
-        testset_outs = ['[%s] %s' % (strftime("%Y-%m-%d %H:%M:%S"),
-                                     "Invoking the Testset<%s>" % self.name)
-        ]
+        testset_outs = ['[%s] %s' % (strftime("%Y-%m-%d %H:%M:%S"), "Invoking the Testset<%s>" % self.name)]
 
         try:
             self.function()
@@ -64,13 +60,13 @@ class TestsetInvoker:
         except TestcaseError as e:
             print("ERROR: %s" % traceback.format_exc())
             testset_outs.append('[%s] %s' % (strftime("%Y-%m-%d %H:%M:%S"),
-                                             "Testset<%s> terminated due to an internal" \
+                                             "Testset<%s> terminated due to an internal"
                                              " error." % self.name))
             return {
                 "status": -3,
                 "result": "ServerIssue",
-                "desc": "Error occured in invoking the testcase. " \
-                        "Error: %s. Check the server log for" \
+                "desc": "Error occurred in invoking the testcase. "
+                        "Error: %s. Check the server log for"
                         " more details." % str(e),
                 "prints": testset_outs
             }
@@ -78,7 +74,7 @@ class TestsetInvoker:
             return {
                 "status": -2,
                 "result": "Error",
-                "desc": "Error occured in invoking the Testcase<%s>. " \
+                "desc": "Error occurred in invoking the Testcase<%s>. "
                         "Error: (%s) at line <%s>" % (self.name,
                                                       type(e).__name__ + ": " + str(e),
                                                       traceback.extract_tb(e.__traceback__)[-1][1]),
@@ -94,7 +90,7 @@ class TestsetInvoker:
             }
 
 
-#python decorator
+# python decorator
 def testset(name, webmodule):
     """It's a decorator which to be used for defining the testsets."""
 
@@ -103,7 +99,7 @@ def testset(name, webmodule):
         if not hasattr(module, 'print'):
             module.print = testprint
 
-        #correcting the webmodule url if not properly written.
+        # correcting the webmodule url if not properly written.
         url_seg = []
         for segment in webmodule.split('/'):
             segment = segment.strip()
@@ -125,62 +121,72 @@ def testset(name, webmodule):
     return alt_func
 
 
-def testcase(input):
+def testcase(testcase_input):
     """testcase(input) function must be used within a testset.
 
 input - should be a dict object containing the input values for webmodule"""
 
     try:
 
-        prevframe = inspect.currentframe().f_back.f_back
+        prev_frame = inspect.currentframe().f_back.f_back
 
-        #getting the function object from locals
-        func = prevframe.f_locals['caller']
-        webmodule = prevframe.f_locals['webmodule']
-        #getting the opener object for this current testcase run.
-        opener = prevframe.f_locals['opener']
+        # getting the function object from locals
+        # func = prev_frame.f_locals['caller']
+        webmodule = prev_frame.f_locals['webmodule']
+        # getting the opener object for this current testcase run.
+        opener = prev_frame.f_locals['opener']
     except:
-        raise InvalidTestcaseInvoke("The testcase function must be invoked " \
-                                    "from a function decorated with" \
+        raise InvalidTestcaseInvoke("The testcase function must be invoked "
+                                    "from a function decorated with"
                                     " @testset") from None
     else:
         try:
-            #invoking the webmodule
-            rets = _invoke_webmodule(opener, webmodule, input)
+            # invoking the webmodule
+            rets = _invoke_webmodule(opener, webmodule, testcase_input)
             return json.loads(rets.decode())
         except:
-            #incase any error occurred during invoking of webmodule
+            # in case any error occurred during invoking of webmodule
             raise TestcaseError("Error: %s" % traceback.format_exc())
 
 
 def test(first, second):
     """compares the first and second values.
     If not equals, raises TestcaseFailed Exception"""
-    #basic comparision
+    # basic comparison
     if first != second:
-        raise TestcaseFailed("Test failed: Excepted value " \
+        raise TestcaseFailed("Test failed: Excepted value "
                              ": <%s> Return value : <%s>" % (second, first))
 
 
-def _invoke_webmodule(opener, url, input):
+def _invoke_webmodule(opener, url, testcase_input):
     """Internal function which invokes the webmodule"""
-    #quote function will be used to quote the values passed as
-    #param to the webmodule
-    quote = urllib.parse.quote
+    # quote function will be used to quote the values passed as
+    # param to the webmodule
 
-    #invoking the webmodule.
-    #TODO: https protocol need to be supported.
-    #TODO: Support file and post form submit method.
+    t_inputs = []
+    for key, value in testcase_input.items():
+        if isinstance(value, str):
+            t_inputs.append((key, value))
+        else:
+            try:
+                for v in value:
+                    t_inputs.append((key, v))
+            except:
+                t_inputs.append((key, value))
+
+    # invoking the webmodule.
+    # TODO: https protocol need to be supported.
+    # TODO: Support file and post form submit method.
     response = opener.open("http://" + listen + url,
-                           urllib.parse.urlencode(input).encode('UTF-8'))
+                           urllib.parse.urlencode(t_inputs).encode('UTF-8'))
     return response.read()
 
 
 def testprint(*args, **kwargs):
     try:
-        prevframe = inspect.currentframe().f_back.f_back
+        prev_frame = inspect.currentframe().f_back.f_back
 
-        prints = prevframe.f_locals['testset_outs']
+        prints = prev_frame.f_locals['testset_outs']
     except:
         print(*args, **kwargs)
     else:
@@ -204,10 +210,6 @@ class InvalidTestcaseInvoke(Exception):
 
 
 class ErrorInvokingWebModule(Exception):
-    pass
-
-
-class TestcaseFailed(Exception):
     pass
 
 
