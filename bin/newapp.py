@@ -29,7 +29,7 @@ Example :
     newapp my_new_app
 """)
 
-config_file = """#!/bin/env python
+config_file = """#!/usr/bin/env python
 
 ########################################################################################################################
 #                                    BlackPearl Application configuration file
@@ -41,13 +41,13 @@ config_file = """#!/bin/env python
 #
 ########################################################################################################################
 
-name= "{appname}"
+name = "{fullappname}"
 
 # Description: Application Name.
 # Example : name = "My First BlackPearl Application"
 # Optional: Yes (if not specified: The folder name will be used as application name)
 
-url_prefix="/{appname}"
+url_prefix = "/{appname}"
 
 # Description: URL Prefix for the web application.
 # Example : url_prefix = "/reservation"
@@ -112,8 +112,7 @@ posthandlers = []
 
 """
 
-handlers_file = """
-#!/bin/env python
+handlers_file = """#!/usr/bin/env python
 
 from BlackPearl.core import datatype
 from BlackPearl.core.decorators import weblocation

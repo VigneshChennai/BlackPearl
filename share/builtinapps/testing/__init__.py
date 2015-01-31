@@ -14,3 +14,7 @@
 
 # You should have received a copy of the GNU General Public License
 # along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
+
+"""
+The STS (Server Testsets) application will have all the testcases to test the server builtin functionality.
+"""
