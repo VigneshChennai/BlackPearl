@@ -531,7 +531,7 @@ def start(config, daemon=False):
         ev_loop.call_soon(app_server.start)
 
         def signal_handler(signum):
-            print('Receive signal : ', signum)
+            print('Received signal : ', signum)
             if signum in (signal.SIGTERM, signal.SIGINT, signal.SIGABRT):
                 print("INFO: Stopping BlackPearl service")
                 app_server.stop()

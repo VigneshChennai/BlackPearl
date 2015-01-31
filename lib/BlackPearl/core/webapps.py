@@ -98,10 +98,13 @@ class Webapp:
 
     def initialize(self):
         """initializes the webapp"""
+
+        print("INFO: Initializing webapp folder <%s>" % self.folder_name)
         try:
             config = importlib.import_module(self.folder_name + ".config")
-        except ImportError:
-            print("SEVERE: config.py not found inside webapp <%s>" % self.folder_name)
+        except ImportError as e:
+            print("SEVERE: config.py not found inside webapp <%s> or error importing config file" % self.folder_name)
+            print("SEVERE: Actual error: %s" % str(e))
             return False
 
         self._init_basics(config)
@@ -125,6 +128,7 @@ class Webapp:
             print("ERROR: %s" % traceback.format_exc())
             print("WARNING: Ignoring testcases in this webapp")
 
+        print("INFO: Initialization of webapp <%s> completed." % self.name)
         return True
 
     def _init_basics(self, config):
