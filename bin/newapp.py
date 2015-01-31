@@ -31,91 +31,115 @@ Example :
 
 config_file = """#!/bin/env python
 
-################################################################################
-#                  BlackPearl Application configuration file
+########################################################################################################################
+#                                    BlackPearl Application configuration file
 #
-fullname = "{fullappname}"
-author = "{author}"
-website = "{website}"
-email = "{emailid}"
+# Full Name = "{fullappname}"
+# Author = "{author}"
+# Website = "{website}"
+# Email ID = "{emailid}"
 #
-################################################################################
-
+########################################################################################################################
 
 name= "{appname}"
 
-#URL Prefix for the web application.
-#
-#If it is not specified, the folder name of the web application will be taken as
-#url_prefix
-#
-#A url_prefix "ROOT" will make the application to hosted on the root level.
-#
-#Example :-
-# if url_prefix="dwm"
-# then the application will be deployed at "www.example.com/dwm"
-#
-# if url_prefix="ROOT"
-# then the application will be deployed at "www.example.com"
-#
+# Description: Application Name.
+# Example : name = "My First BlackPearl Application"
+# Optional: Yes (if not specified: The folder name will be used as application name)
 
-url_prefix="{appname}"
+url_prefix="/{appname}"
 
-#Handlers are the list of python files which holds the python web modules.
+# Description: URL Prefix for the web application.
+# Example : url_prefix = "/reservation"
+# Optional: Yes (if not specified: The folder name will be used as url_prefix)
 #
-#The functions which are using @weblocation decorate but not in the below listed
-#python files will be ignored.
+# Note:
+#       1. url_prefix should start with '/'. If not, '/' will be automatically prefixed to it with a warning while the
+#          server starts.
+#       2. if url_prefix=/ then the application will be deployed as root application.
 #
-#Example : if python file is (Webapp/handler.py)
-#then
-#handlers = ['Webapp.handler']
 
 handlers = ["{appname}.handlers"]
 
-#If sessions are not used in the application, the below should be set to False
+# Description: Handlers are the list of python modules which holds the blackpearl web modules.
+#
+# Example : if python file is (Webapp/handlers.py and in Webapp/login_handlers.py) then
+#           handlers = ['Webapp.handler', 'Webapp.login_handlers.py']
+#
+# Note: Each blackpearl web modules decorated with @weblocation decorate but not defined in the below python modules
+#       will be ignored
+#
+
 session_enabled = True
 
+# Description: Enables or disables session feature in the webapp.
+#
+# Example : session_enabled = True
 
-#List of python function which need to process the incoming request before
-#handing it to the webmodules.
-#Note: The list defined here are for specifying the order of execution only.
-#      The preprocessors must be decorate with @preprocessor decorator
+# Note:
+#       1. Session are saved in the user browser cookie.
+#       2. Sessions are encrypted before saving in cookie, so it safe to save data which are sensitive but try to void
+#          saving sensitive data in session.
+#       3. Always store less amount of data in session, since it is saved in cookie, server will throw error when
+#          storing large data (For example: you can store a string data of size ~2840 bytes maximum).
 #
-#This is not the python files, it should the list of full python function name
-#
-#Example : if python function "preprocessor" listed under Webapp/handler.py file
-#then
-#preprocessor = ['Webapp.handler.preprocessor']
 
 preprocessors = []
 
-#List of python function which need to process the outgoing request after
-#the webmodules processed the request.
-#Note: The list defined here are for specifying the order of execution only.
-#      The posthandler must be decorate with @posthandler decorator
+# Description: List of python function which need to process the incoming request before handing it to the web modules.
+# Example : if preprocessor python functions (ie. functions decorated with @preprocessor decorator)
+#           "access_check" and "unique_user_count" defined under Webapp/preprocessors.py file then
 #
-#This is not the python files, it should the list of full python function name
+#           preprocessors = ['Webapp.preprocessors.access_check', 'Webapp.preprocessors.unique_user_count']
 #
-#Example : if python function "posthandler" listed under Webapp/handler.py file
-#then
-#posthandler = ['Webapp.handler.posthandler']
+# Optional: Yes
+#
+# Note: preprocessors list defined here is for specifying the order of execution only. The python function must be
+#       decorated with @preprocessor to define it as preprocessor
 
 posthandlers = []
+
+# Description: List of python function which need to process the outgoing data after the web module handled the request.
+# Example : if posthandler python functions (ie. functions decorated with @posthandler decorator)
+#           "data_validation_filter" and "data_formatting" defined under Webapp/posthandlers.py file then
+#
+#           preprocessors = ['Webapp.posthandlers.data_validation_filter', 'Webapp.posthandlers.data_formatting']
+#
+# Optional: Yes
+#
+# Note: Posthandlers list defined here is for specifying the order of execution only. The python function must be
+#       decorated with @posthandler to define it as posthandler
 
 """
 
 handlers_file = """
 #!/bin/env python
 
+from BlackPearl.core import datatype
 from BlackPearl.core.decorators import weblocation
 
-@weblocation("hello")
-def hello():
+
+@weblocation("helloworld")
+def helloworld():
     ret = {
             "msg" : "Hello world",
             "desc" : "My first hello world BlackPearl web application"
     }
     return ret
+
+
+@weblocation("/calculator")
+def simple_calculator(operation: datatype.Options("add", "sub", "mul", "div"),
+                      value1: datatype.Float(),
+                      value2: datatype.Float()):
+    if operation == "add":
+        return value1 + value2
+    elif operation == "sub":
+        return value1 - value2
+    elif operation == "mul":
+        return value1 * value2
+    else:
+        return value1 / value2
 """
 
 
