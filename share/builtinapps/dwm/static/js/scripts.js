@@ -118,9 +118,9 @@ function load_description(id) {
     if(_applications[id].description) {
         var rendered = Mustache.render(desc_tmpl, {"desc" :
                                         _applications[id].description});
-        $("#description-app").html(rendered);
+        $("#application-details").html(rendered);
     } else {
-        $("#description-app").html(strings.app_desc_missing);
+        $("#application-details").html(strings.app_desc_missing);
     }
 
     $("#handlers-count").html(_applications[id].handlers.length);
@@ -200,9 +200,9 @@ function load_testsets(testsets) {
 
 function generate_form_elements(args) {
     //clearing the output
-    $("#output-box").html('<pre style="min-height:200px"></pre>');
-    $("#output-panel").removeClass();
-    $("#output-panel").addClass("panel panel-default");
+    $("#module-output-body").html('<pre style="min-height:200px"></pre>');
+    $("#module-output-panel").removeClass();
+    $("#module-output-panel").addClass("panel panel-default");
     input_tmpl = $("#form-input-item-tmpl").html();
 
     form_inputs = []
@@ -239,7 +239,7 @@ function invoke() {
     output_tmpl = $("#output-tmpl").html();
     var execute_all = $("#testcase-execute-all-btn").prop( "disabled");
     $(".execute_btn").prop( "disabled", true );
-    $("#output-box").html('<pre style="min-height:200px"><div class="spinner"> ' +
+    $("#module-output-body").html('<pre style="min-height:200px"><div class="spinner"> ' +
     '<div class="spinner-container container1"> <div class="circle1"></div> <div class="circle2"></div> ' +
     '<div class="circle3"></div> <div class="circle4"></div> </div> <div class="spinner-container container2"> ' +
     '<div class="circle1"></div> <div class="circle2"></div> <div class="circle3"></div> <div class="circle4"></div> ' +
@@ -248,14 +248,14 @@ function invoke() {
     $.post( _current_module, $('#invoke-form').serialize(), function(data) {
 
          if(data.status == 0) {
-            $("#output-panel").removeClass();
-            $("#output-panel").addClass("panel panel-success");
+            $("#module-output-panel").removeClass();
+            $("#module-output-panel").addClass("panel panel-success");
          } else {
-            $("#output-panel").removeClass();
-            $("#output-panel").addClass("panel panel-danger");
+            $("#module-output-panel").removeClass();
+            $("#module-output-panel").addClass("panel panel-danger");
          }
          var rendered = Mustache.render(output_tmpl, {"output" :JSON.stringify(data, null, 4)});
-         $("#output-box").html(rendered);
+         $("#module-output-body").html(rendered);
         $(".execute_btn").prop( "disabled", false);
        },
        'json' // I expect a JSON response
@@ -299,7 +299,7 @@ function execute_testset(testset) {
     var url = "";
     var execute_all = $("#testcase-execute-all-btn").prop( "disabled");
     $(".execute_btn").prop( "disabled", true );
-    $("#output-box").html('<pre style="min-height:200px"><div class="spinner"> ' +
+    $("#module-output-body").html('<pre style="min-height:200px"><div class="spinner"> ' +
     '<div class="spinner-container container1"> <div class="circle1"></div> <div class="circle2"></div> ' +
     '<div class="circle3"></div> <div class="circle4"></div> </div> <div class="spinner-container container2"> ' +
     '<div class="circle1"></div> <div class="circle2"></div> <div class="circle3"></div> <div class="circle4"></div> ' +
@@ -314,14 +314,14 @@ function execute_testset(testset) {
     $.get(url, function(data) {
 
          if(data.status == 0) {
-            $("#output-panel").removeClass();
-            $("#output-panel").addClass("panel panel-success");
+            $("#module-output-panel").removeClass();
+            $("#module-output-panel").addClass("panel panel-success");
          } else {
-            $("#output-panel").removeClass();
-            $("#output-panel").addClass("panel panel-danger");
+            $("#module-output-panel").removeClass();
+            $("#module-output-panel").addClass("panel panel-danger");
          }
          var rendered = Mustache.render(output_tmpl, {"output" :JSON.stringify(data, null, 4)});
-         $("#output-box").html(rendered);
+         $("#module-output-body").html(rendered);
        },
        'json' // I expect a JSON response
     ).always(function() {

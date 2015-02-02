@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>The Black Pearl - Deployed Web Modules</title>
+    <title>Black Pearl - Deployed Web Modules Application</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="">
     <meta name="author" content="">
@@ -40,6 +40,9 @@
         </div>-->
         {{{desc}}}
 
+
+
+
     </script>
 
     <script id="applications-list-tmpl" type="x-tmpl-mustache">
@@ -49,6 +52,9 @@
             </li>
         {{/data}}
 
+
+
+
     </script>
     <script id="modules-list-tmpl" type="x-tmpl-mustache">
         {{#data}}
@@ -56,6 +62,9 @@
               class="overflow-ellipse list-group-item module-list-item {{#active}}active{{/active}}"
               onclick="openmodule('{{location}}', this)">{{location}}</a>
         {{/data}}
+
+
+
 
     </script>
 
@@ -86,9 +95,13 @@
             </div>
         </div>
 
+
+
+
     </script>
     <script id="output-tmpl" type="x-tmpl-mustache">
         <pre style="min-height:200px">{{output}}</pre>
+
 
     </script>
     <script id="list-tmpl" type="x-tmpl-mustache">
@@ -98,6 +111,9 @@
               class="overflow-ellipse list-group-item module-list-item">{{valueOf}}</a>
         {{/data}}
 		</div>
+
+
+
 
 
     </script>
@@ -122,118 +138,128 @@
 			</div>
 		</div>
 
+
+
+
     </script>
 </head>
 
 <body onload='load()'>
-    <nav class="navbar navbar-default navbar-inverse" role="navigation">
-        <div class="navbar-header">
-            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar-collapse-1">
-                <span class="sr-only">Toggle navigation</span>
-                <span class="icon-bar"></span>
-                <span class="icon-bar"></span>
-                <span class="icon-bar"></span>
-            </button>
-            <a class="navbar-brand" href="/dwm">The Black Pearl</a>
-        </div>
+<nav class="navbar navbar-default navbar-inverse" role="navigation">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar-collapse-1">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="/dwm">The Black Pearl</a>
+    </div>
 
-        <div class="collapse navbar-collapse" id="navbar-collapse-1">
-            <ul id="topmenu-apps" class="nav navbar-nav">
-            </ul>
+    <div id="topmenu-apps-panel" class="collapse navbar-collapse" id="navbar-collapse-1">
+        <ul id="topmenu-apps" class="nav navbar-nav">
+        </ul>
+    </div>
+</nav>
+<div class="container" style="width:100%;">
+    <div id="notification-panel" class="row clearfix">
+        <div class="col-md-12 column">
         </div>
-    </nav>
-    <div class="container" style="width:100%;">
-        <!--<div class="row clearfix" style="margin-top:70px;">
-        </div>-->
+    </div>
+    <div id="application-panel" class="panel panel-default bottom20">
+        <div class="panel-heading" data-toggle="collapse" style="cursor: pointer;"
+             href="#application-details-panel">
+            <a class="panel-title">Application Details</a>
 
-        <div class="row clearfix" id="notification_area">
-            <div class="col-md-12 column">
+            <div class="pull-right reduce-half">
+                <a href="javascript:void(0)" id="handlers-link" class="reduce-9">Handlers (<span
+                        id="handlers-count"></span>)</a> |
+                <a href="javascript:void(0)" id="preprocessor-link" class="reduce-9">Preprocessors (<span
+                        id="preprocessors-count"></span>)</a> |
+                <a href="javascript:void(0)" id="posthandlers-link" class="reduce-9">Posthandlers (<span
+                        id="posthandlers-count"></span>)</a>
+                <script>
+                    $("#handlers-link").click(function (e) {
+                        display_handlers();
+                        e.stopPropagation();
+                        e.preventDefault();
+                    });
+                    $("#preprocessor-link").click(function (e) {
+                        display_preprocessors();
+                        e.stopPropagation();
+                        e.preventDefault();
+                    });
+                    $("#posthandlers-link").click(function (e) {
+                        display_posthandlers();
+                        e.stopPropagation();
+                        e.preventDefault();
+                    });
+                </script>
             </div>
         </div>
-        <div class="panel-group bottom10" id="collapse-group">
-            <div class="panel panel-default bottom20">
-                <div class="panel-heading" data-toggle="collapse" style="cursor: pointer;"
-                     href="#application-details-panel">
-                    <a class="panel-title">Application Details</a>
-
-                    <div class="pull-right reduce-half">
-                        <a href="javascript:void(0)" id="handlers-link" class="reduce-9">Handlers (<span
-                                id="handlers-count"></span>)</a> |
-                        <a href="javascript:void(0)" id="preprocessor-link" class="reduce-9">Preprocessors (<span
-                                id="preprocessors-count"></span>)</a> |
-                        <a href="javascript:void(0)" id="posthandlers-link" class="reduce-9">Posthandlers (<span
-                                id="posthandlers-count"></span>)</a>
-                        <script>
-                            $("#handlers-link").click(function (e) {
-                                display_handlers();
-                                e.stopPropagation();
-                                e.preventDefault();
-                            });
-                            $("#preprocessor-link").click(function (e) {
-                                display_preprocessors();
-                                e.stopPropagation();
-                                e.preventDefault();
-                            });
-                            $("#posthandlers-link").click(function (e) {
-                                display_posthandlers();
-                                e.stopPropagation();
-                                e.preventDefault();
-                            });
-                        </script>
-                    </div>
-                </div>
-                <div id="application-details-panel" class="panel-collapse in">
-                    <div class="panel-body">
-                        <div id="description-app" class="col-md-12 column top10 bottom10">
-                            <script type="text/javascript">
-                                <!--
-                                document.write(strings.app_desc_missing);
-                                //-->
-                            </script>
-                        </div>
-                    </div>
-
+        <div id="application-details-panel" class="panel-collapse in">
+            <div class="panel-body">
+                <div id="application-details" class="col-md-12 column top10 bottom10">
+                    <script type="text/javascript">
+                        <!--
+                        document.write(strings.app_desc_missing);
+                        //-->
+                    </script>
                 </div>
             </div>
-            <div class="panel panel-default">
-                <div class="panel-heading" data-toggle="collapse" style="cursor: pointer;" href="#modules-panel">
-                    <a class="panel-title">Modules</a>
-                </div>
-                <div class="panel-body panel-collapse in" id="modules-panel">
-                    <div class="row clearfix">
-                        <div class="col-lg-3 column bottom20">
-                            <div class="paraheading">Deployed modules (<span id="modules-count"></span>)</div>
-                            <div id='modules-list' class="padding-top15 list-group">
 
+        </div>
+    </div>
+    <div id="content-panel" class="tabbable">
+        <ul id="content-panel-nav" class="nav nav-tabs">
+            <li class="active">
+                <a href="#modules-panel"
+                   data-toggle="tab">Modules</a>
+            </li>
+            <li>
+                <a href="#testsets-panel"
+                   data-toggle="tab">All Test Sets</a>
+            </li>
+        </ul>
+        <div id="content-panel-content" class="tab-content">
+            <div id="modules-panel" class="tab-pane active">
+                <div class="panel panel-default no-border-top">
+                    <div class="panel-body  no-border-top panel-collapse in">
+                        <div class="row clearfix">
+                            <div id="modules-list-panel" class="col-lg-3 column bottom20">
+                                <div class="paraheading">Deployed modules (<span id="modules-count"></span>)</div>
+                                <div id='modules-list' class="padding-top15 list-group">
+
+                                </div>
                             </div>
-                        </div>
-
-                        <div class="col-lg-9 column bottom20">
-                            <div class="bottom20">
-                                <div class="tabbable" id="tabs-529884">
-                                    <ul class="nav nav-tabs">
+                            <div id="modules-content-panel" class="col-lg-9 column bottom20">
+                                <div id="module-panel" class="tabbable">
+                                    <ul id="module-panel-nav" class="nav nav-tabs">
                                         <li class="active">
-                                            <a href="#panel-498084" onclick="$('#output-container').show()"
+                                            <a href="#module-content-invoke" onclick="$('#module-output-panel').show()"
                                                data-toggle="tab">Invoke</a>
                                         </li>
                                         <li>
-                                            <a href="#panel-498207" onclick="$('#output-container').hide()"
+                                            <a href="#module-content-desc" onclick="$('#module-output-panel').hide()"
                                                data-toggle="tab">Description</a>
                                         </li>
                                         <li>
-                                            <a href="#panel-498205" onclick="$('#output-container').show()"
+                                            <a href="#module-content-testsets"
+                                               onclick="$('#module-output-panel').show()"
                                                data-toggle="tab">Test Sets</a>
                                         </li>
                                     </ul>
-                                    <div class="tab-content">
-                                        <div class="tab-pane active" id="panel-498084">
-                                            <div class="panel  panel-default no-border-top" style="overflow:visible">
+                                    <div id="module-panel-content" class="tab-content">
+                                        <div id="module-content-invoke" class="tab-pane active">
+                                            <div class="panel  panel-default no-border-top"
+                                                 style="overflow:visible">
                                                 <div class="panel-body nopadding no-border-top">
                                                     <form class="form-horizontal" role="form" id="invoke-form"
                                                           enctype="multipart/form-data">
                                                         <table class="fullsize">
                                                             <tr>
-                                                                <td class="fixed-col-md-9 " valign="top" align="left">
+                                                                <td class="fixed-col-md-9 " valign="top"
+                                                                    align="left">
                                                                     <div class="padding30 ">
                                                                         <h4>Required Inputs</h4><br/>
 
@@ -263,14 +289,18 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="tab-pane" id="panel-498205">
+                                        <div id="module-content-testsets" class="tab-pane">
                                             <div class="row clearfix">
                                                 <div class="col-md-12 column">
                                                     <div class="panel panel-default no-border-top">
                                                         <div class="panel-heading height45">
-                                                              <button id="testcase-execute-all-btn" class="testset_btn pull-right btn btn-primary execute_btn" onclick="execute_testset()">Execute All</button>
+                                                            <button id="testcase-execute-all-btn"
+                                                                    class="testset_btn pull-right btn btn-primary execute_btn"
+                                                                    onclick="execute_testset()">Execute All
+                                                            </button>
                                                         </div>
-                                                        <div id="testsets-container" class="panel-body no-border-top">
+                                                        <div id="testsets-container"
+                                                             class="panel-body no-border-top">
                                                             <div class="col-md-4 column" style="visibility: hidden">
                                                                 <div class="progress">
                                                                     <div class="progress-bar progress-success">
@@ -282,11 +312,12 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="tab-pane" id="panel-498207">
+                                        <div id="module-content-desc" class="tab-pane">
                                             <div class="row clearfix">
                                                 <div class="col-md-12 column">
                                                     <div class="panel panel-default no-border-top">
-                                                        <div class="panel-body no-border-top" id="description-module">
+                                                        <div class="panel-body no-border-top"
+                                                             id="description-module">
                                                         </div>
                                                     </div>
                                                 </div>
@@ -294,59 +325,64 @@
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                            <div id="output-container" class="row clearfix">
-                                <div class="col-md-12 column">
-                                    <div id="output-panel" class="panel panel-default">
-                                        <div class="panel-heading">
-                                            <a class="panel-title">Output</a>
-                                        </div>
-                                        <div id="output-box" class="panel-body">
-                                                <pre id="output-id">
-
-
-
-
-
-
-
-
-                                                </pre>
-                                        </div>
+                                <div id="module-output-panel" class="panel panel-default top20">
+                                    <div class="panel-heading">
+                                        <a class="panel-title">Output</a>
                                     </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                                    <div id="module-output-body" class="panel-body">
+                                        <pre>
 
-                    <a style="display:none" id="ModalMsg" href="#modal-container-msg" role="button" class="btn"
-                       data-toggle="modal">Launch Message</a>
 
-                    <div class="modal fade" id="modal-container-msg" role="dialog" aria-labelledby="ModalMsg-title"
-                         aria-hidden="true">
-                        <div class="modal-dialog">
-                            <div id="modal-type" class="modal-content panel-info">
-                                <div class="modal-header panel-heading">
-                                    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
-                                    <h4 class="modal-title" id="ModalMsg-title">
-                                        Modal title
-                                    </h4>
-                                </div>
-                                <div class="modal-body" id="ModalMsg-body">
-                                    ...
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
+
+
+
+
+
+
+                                        </pre>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+            <div id="testsets-panel" class="tab-pane active">
+                <div class="panel panel-default no-border-top">
+                    <div class="panel-heading height45">
+                        <button class="testset_btn pull-right btn btn-primary execute_btn">Execute All</button>
+                    </div>
+                    <div class="panel-body  no-border-top panel-collapse in">
+                        <div class="row clearfix">
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <script>
-
-        </script>
     </div>
+    <div id="modal-notification-dialog" class="modal fade" role="dialog"
+         aria-labelledby="ModalMsg-title"
+         aria-hidden="true">
+        <div class="modal-dialog">
+            <div id="modal-type" class="modal-content panel-info">
+                <div class="modal-header panel-heading">
+                    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">
+                        ×
+                    </button>
+                    <h4 class="modal-title" id="ModalMsg-title">
+                        Modal title
+                    </h4>
+                </div>
+                <div class="modal-body" id="ModalMsg-body">
+                    ...
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-dismiss="modal">Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 </body>
 </html>
