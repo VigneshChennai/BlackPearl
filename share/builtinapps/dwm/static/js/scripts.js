@@ -20,7 +20,7 @@ strings = {
                         '#The license  description',
                         '#',
                         '',
-                        '"""Your documention should go here"""',
+                        '"""Your documentation should go here"""',
                         '</pre>',
                         '    </div>',
                         '</div>'//,
@@ -60,16 +60,29 @@ strings = {
     no_handlers: 'No handlers deployed',
     no_preprocessors : 'No preprocessors deployed',
     no_posthandlers: 'No posthandlers deployed'
+};
+
+var _applications = null;
+var _current_module = null;
+var _current_app_id = 0;
+
+function load() {
+    var future = initialize_applications();
+    future.success = function () {
+        load_topmenu();
+        load_description();
+        load_modules();
+    };
+
+    future.failure = function () {
+        error("Error initializing","We are facing challenge in access the server. Check your network connectivity");
+    }
 }
 
-_applications = null;
-_current_module = null;
-_current_app_id = 0;
-
-function initialize_applications(callback) {
-    ret = {}
+function initialize_applications() {
+    var ret = {};
     $.getJSON("applications", function (data){
-        status = data.status;
+        var status = data.status;
 
         if(status == 0) {
             _applications = data.data;
@@ -86,35 +99,24 @@ function initialize_applications(callback) {
     return ret;
 }
 
-function load() {
-    future = initialize_applications();
-    future.success = function () {
-        load_topmenu();
-        load_description();
-        load_modules();
-    };
-
-    future.failure = function () {
-        error("Error initializing","We are facing challenge in access the server. Check your network connectivity");
-    }
-}
 function load_topmenu() {
-    var applist = $('#applications-list-tmpl').html();
-    var apps = []
-    for(i = 0; i < _applications.length; i++) {
+    var app_list = $('#applications-list-tmpl').html();
+    var apps = [];
+    for(var i = 0; i < _applications.length; i++) {
         apps.push({
             "id" : i,
             "name" : _applications[i].name
         })
     }
     apps[0].active = true;
-    var rendered = Mustache.render(applist, {"data" :apps});
+    var rendered = Mustache.render(app_list, {"data" :apps});
     $("#topmenu-apps").html(rendered);
 }
 
 function load_description(id) {
     id = typeof id !== 'undefined' ? id : 0;
-    desc_tmpl = $("#applications-desc-tmpl").html();
+
+    var desc_tmpl = $("#applications-desc-tmpl").html();
     if(_applications[id].description) {
         var rendered = Mustache.render(desc_tmpl, {"desc" :
                                         _applications[id].description});
@@ -131,8 +133,9 @@ function load_description(id) {
 
 function load_modules(id) {
     id = typeof id !== 'undefined' ? id : 0;
-    var modlist = $('#modules-list-tmpl').html();
-    var modules = []
+
+    var mod_list = $('#modules-list-tmpl').html();
+    var modules = [];
     for(i = 0; i < _applications[id].modules.length; i++) {
         modules.push({
             "id" : i,
@@ -141,13 +144,43 @@ function load_modules(id) {
     }
     if(modules.length > 0) {
         modules[0].active = true;
-        url = modules[0].location;
-        var rendered = Mustache.render(modlist, {"data" :modules});
+        var url = modules[0].location;
+        var rendered = Mustache.render(mod_list, {"data" :modules});
         $("#modules-list").html(rendered);
         load_signature(url);
         $("#modules-count").html(modules.length);
     } else {
         $("#modules-list").html(strings.modules_missing);
+    }
+}
+
+function load_signature(url) {
+    //$("#module-details-selected").html(url);
+    $.getJSON("signature?url=" + url , function (data){
+            if (data.data.desc) {
+                $("#description-module").html(data.data.desc)
+            } else {
+                $("#description-module").html(strings.module_desc_missing)
+            }
+            load_testsets(data.data.testsets);
+            generate_form_elements(data.data.signature);
+            _current_module=url;
+    });
+}
+
+function load_testsets(testsets) {
+    var tmpl = $("#testset-tmpl").html();
+
+    if(testsets.length > 0) {
+        var rendered = "";
+        for(var i=0;i<testsets.length;i++) {
+             rendered += Mustache.render(tmpl, testsets[i]);
+        }
+        $("#testsets-container").html(rendered);
+        $("#testcase-execute-all-btn").prop( "disabled", false);
+    } else {
+        $("#testcase-execute-all-btn").prop( "disabled", true);
+        $("#testsets-container").html("No testsets defined");
     }
 }
 
@@ -168,44 +201,16 @@ function openmodule(url, object) {
     load_signature(url);
 }
 
-function load_signature(url) {
-    //$("#module-details-selected").html(url);
-    $.getJSON("signature?url=" + url , function (data){
-            if (data.data.desc) {
-                $("#description-module").html(data.data.desc)
-            } else {
-                $("#description-module").html(strings.module_desc_missing)
-            }
-            load_testsets(data.data.testsets);
-            generate_form_elements(data.data.signature);
-            _current_module=url;
-    });
-}
-
-function load_testsets(testsets) {
-    tmpl = $("#testset-tmpl").html();
-
-    if(testsets.length > 0) {
-        var rendered = "";
-        for(i=0;i<testsets.length;i++) {
-             rendered += Mustache.render(tmpl, testsets[i]);
-        }
-        $("#testsets-container").html(rendered);
-        $("#testcase-execute-all-btn").prop( "disabled", false);
-    } else {
-        $("#testcase-execute-all-btn").prop( "disabled", true);
-        $("#testsets-container").html("No testsets defined");
-    }
-}
-
 function generate_form_elements(args) {
     //clearing the output
-    $("#module-output-body").html('<pre style="min-height:200px"></pre>');
-    $("#module-output-panel").removeClass();
-    $("#module-output-panel").addClass("panel panel-default");
-    input_tmpl = $("#form-input-item-tmpl").html();
+    var output_body = $("#module-output-body");
+    output_body.html('<pre style="min-height:200px"></pre>');
+    var output_panel = $("module-output-panel");
+    output_panel.removeClass();
+    output_panel.addClass("panel panel-default top20");
+    var input_tmpl = $("#form-input-item-tmpl").html();
 
-    form_inputs = []
+    var form_inputs = [];
     args.forEach(function (arg, index) {
         arg.name = arg.arg.charAt(0).toUpperCase() + arg.arg.slice(1);
         if (arg.type == "Float datatype") {
@@ -236,7 +241,7 @@ function generate_form_elements(args) {
 }
 
 function invoke() {
-    output_tmpl = $("#output-tmpl").html();
+    var output_tmpl = $("#output-tmpl").html();
     var execute_all = $("#testcase-execute-all-btn").prop( "disabled");
     $(".execute_btn").prop( "disabled", true );
     $("#module-output-body").html('<pre style="min-height:200px"><div class="spinner"> ' +
@@ -247,12 +252,13 @@ function invoke() {
     '<div class="circle3"></div> <div class="circle4"></div> </div></div></pre>');
     $.post( _current_module, $('#invoke-form').serialize(), function(data) {
 
+        var output_panel = $("#module-output-panel");
          if(data.status == 0) {
-            $("#module-output-panel").removeClass();
-            $("#module-output-panel").addClass("panel panel-success");
+            output_panel.removeClass();
+            output_panel.addClass("panel panel-success top20");
          } else {
-            $("#module-output-panel").removeClass();
-            $("#module-output-panel").addClass("panel panel-danger");
+            output_panel.removeClass();
+            output_panel.addClass("panel panel-danger top20");
          }
          var rendered = Mustache.render(output_tmpl, {"output" :JSON.stringify(data, null, 4)});
          $("#module-output-body").html(rendered);
@@ -266,7 +272,7 @@ function invoke() {
 }
 
 function display_handlers() {
-    tmpl = $("#list-tmpl").html()
+    var tmpl = $("#list-tmpl").html();
     if(_applications[_current_app_id].handlers.length>0) {
         var rendered = Mustache.render(tmpl, {"data" :_applications[_current_app_id].handlers});
         msg("Deployed handlers", rendered);
@@ -275,7 +281,7 @@ function display_handlers() {
     }
 }
 function display_preprocessors() {
-    tmpl = $("#list-tmpl").html()
+    var tmpl = $("#list-tmpl").html();
     if(_applications[_current_app_id].preprocessors.length>0) {
         var rendered = Mustache.render(tmpl, {"data" :_applications[_current_app_id].preprocessors});
         msg("Deployed preprocessors", rendered);
@@ -284,7 +290,7 @@ function display_preprocessors() {
     }
 }
 function display_posthandlers() {
-    tmpl = $("#list-tmpl").html()
+    var tmpl = $("#list-tmpl").html();
     if(_applications[_current_app_id].posthandlers.length>0) {
         var rendered = Mustache.render(tmpl, {"data" :_applications[_current_app_id].posthandlers});
         msg("Deployed posthandlers", rendered);
@@ -312,13 +318,13 @@ function execute_testset(testset) {
     }
 
     $.get(url, function(data) {
-
+         var output_panel = $("#module-output-panel");
          if(data.status == 0) {
-            $("#module-output-panel").removeClass();
-            $("#module-output-panel").addClass("panel panel-success");
+            output_panel.removeClass();
+            output_panel.addClass("panel panel-success");
          } else {
-            $("#module-output-panel").removeClass();
-            $("#module-output-panel").addClass("panel panel-danger");
+            output_panel.removeClass();
+            output_panel.addClass("panel panel-danger");
          }
          var rendered = Mustache.render(output_tmpl, {"output" :JSON.stringify(data, null, 4)});
          $("#module-output-body").html(rendered);
@@ -335,24 +341,27 @@ function form_option_cb(object, id, id_view) {
 }
 
 function msg(title, msg) {
-    $("#modal-type").removeClass();
-    $("#modal-type").addClass("modal-content panel-info");
+    var modal_type = $("#modal-type");
+    modal_type.removeClass();
+    modal_type.addClass("modal-content panel-info");
     $("#ModalMsg-title").html(title);
     $("#ModalMsg-body").html(msg);
     $("#ModalMsg").click();
 }
 
 function warning(title, msg) {
-    $("#modal-type").removeClass();
-    $("#modal-type").addClass("modal-content panel-warning");
+    var modal_type = $("#modal-type");
+    modal_type.removeClass();
+    modal_type.addClass("modal-content panel-warning");
     $("#ModalMsg-title").html(title);
     $("#ModalMsg-body").html(msg);
     $("#ModalMsg").click();
 }
 
 function error(title, msg) {
-    $("#modal-type").removeClass();
-    $("#modal-type").addClass("modal-content panel-danger");
+    var modal_type = $("#modal-type");
+    modal_type.removeClass();
+    modal_type.addClass("modal-content panel-danger");
     $("#ModalMsg-title").html(title);
     $("#ModalMsg-body").html(msg);
     $("#ModalMsg").click();
