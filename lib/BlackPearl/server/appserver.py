@@ -254,17 +254,36 @@ class Nginx(Process):
 
 
 class AppServer():
-    def __init__(self, config, webapps_list):
-        self.config = config
-        app_loc = [config.webapps]
 
+    def __init__(self, config):
+        self.config = config
+
+        self.status = "NOTSTARTED"
+        self.reloading_code = False
+        self.reloading_conf = False
+        self.async_task_handlers = []
+
+        app_loc = [config.webapps]
         if config.adminapps_enabled:
             app_loc.append(config.adminapps)
 
         if config.builtinapps_enabled:
             app_loc.append(config.builtinapps)
 
+        webapps_list = analyse_and_pickle_webapps(
+            "%s/uwsgi/pickle/webapps" % config.run,
+            *app_loc
+        )
+
+        if not webapps_list:
+            print("SEVERE: No application deployed.")
+            raise NoApplicationDeployedError("No application deployed")
+
         self.app_loc = app_loc
+
+        # Asyncio the event loop
+        self.ev_loop = None
+
         self.uwsgi = Uwsgi(
             config.uwsgi, config.home + "/lib/wsgi.py", config.run + "/uwsgi/uwsgi.sock",
             config.logs, config.run, config.security_key, config.security_block_size, config.listen,
@@ -277,24 +296,54 @@ class AppServer():
             config.run, config.share, config.logs
         )
         self.nginx.generate_conf_file(webapps_list)
-        self.status = "NOTSTARTED"
-        self.reload_code_called = False
-        self.afm = None
 
         self._uwsgi_status = "NOTSTARTED"
         self._nginx_status = "NOTSTARTED"
 
-        self.nginx.add_status_listener(functools.partial(self._status_modified_cb, "nginx"))
-        self.uwsgi.add_status_listener(functools.partial(self._status_modified_cb, "uwsgi"))
+        # Defining service status change listener
+        self.nginx.add_status_listener(functools.partial(self._service_status_update_cb, "nginx"))
+        self.uwsgi.add_status_listener(functools.partial(self._service_status_update_cb, "uwsgi"))
 
-        # Initializing Code update Monitor
+    def _code_update_monitor_init(self):
         print("INFO: Watching <%s> paths for file modifications." % str(self.app_loc))
         paths = self.app_loc
         excl = pyinotify.ExcludeFilter([al + "/*/static" for al in self.app_loc])
-        self.afm = fileutils.AsyncFileMonitor(self._code_modified_cb)
+        self.afm = fileutils.AsyncFileMonitor(self._code_update_cb, loop=self.ev_loop)
         self.afm.set_watch_path(paths, rec=True, exclude_filter=excl)
 
-    def start(self):
+    def _signal_init(self):
+        def signal_handler(signum):
+            print('Received signal : ', signum)
+            if signum in (signal.SIGTERM, signal.SIGINT, signal.SIGABRT):
+                print("INFO: Stopping BlackPearl service")
+                self.stop()
+            elif signum == signal.SIGHUP:
+                print("INFO: Redeploy BlackPearl")
+                self.reload_conf()
+            else:
+                print("INFO: Ignoring signal")
+
+        for signal_name in ('SIGINT', 'SIGTERM', 'SIGABRT', 'SIGHUP'):
+            sig = getattr(signal, signal_name)
+            self.ev_loop.add_signal_handler(sig, functools.partial(signal_handler, sig))
+
+    def _async_task(self, task):
+        task_handler = asyncio.async(task, loop=self.ev_loop)
+        self.async_task_handlers.append(task_handler)
+        return task_handler
+
+    def start(self, ev_loop=None):
+        # Getting the event loop
+        if ev_loop:
+            self.ev_loop = ev_loop
+        else:
+            self.ev_loop = asyncio.get_event_loop()
+
+        # Initializing Code update Monitor
+        self._code_update_monitor_init()
+
+        # Initializing handler for OS signal
+        self._signal_init()
 
         def start_cb(service, future):
             try:
@@ -305,13 +354,16 @@ class AppServer():
                 print("ERROR: %s" % error)
                 print("SEVERE: %s failed to start" % service)
 
-        asyncio.async(self.uwsgi.start()).add_done_callback(functools.partial(start_cb, "uwsgi"))
-        asyncio.async(self.nginx.start()).add_done_callback(functools.partial(start_cb, "nginx"))
+        self._async_task(self.uwsgi.start()).add_done_callback(functools.partial(start_cb, "uwsgi"))
+        self._async_task(self.nginx.start()).add_done_callback(functools.partial(start_cb, "nginx"))
+
+        if not ev_loop:
+            self.server_forever()
 
     def stop(self):
         self.status = "STOPPING"
 
-        def start_cb(service, future):
+        def stop_cb(service, future):
             try:
                 future.result()
             except Exception as e:
@@ -320,40 +372,72 @@ class AppServer():
                 print("ERROR: %s" % error)
                 print("SEVERE: %s failed to stop" % service)
 
-        asyncio.async(self.uwsgi.stop()).add_done_callback(functools.partial(start_cb, "uwsgi"))
-        asyncio.async(self.nginx.stop()).add_done_callback(functools.partial(start_cb, "nginx"))
+        self._async_task(self.uwsgi.stop()).add_done_callback(functools.partial(stop_cb, "uwsgi"))
+        self._async_task(self.nginx.stop()).add_done_callback(functools.partial(stop_cb, "nginx"))
+
+    def restart(self):
+        self.status = "RESTARTING"
+
+        def restart_cb(service, future):
+            try:
+                future.result()
+            except Exception as e:
+                error = traceback.format_exc()
+                print("ERROR: %s" % e)
+                print("ERROR: %s" % error)
+                print("SEVERE: %s failed to restart" % service)
+
+        self._async_task(self.uwsgi.restart()).add_done_callback(functools.partial(restart_cb, "uwsgi"))
+        self._async_task(self.nginx.restart()).add_done_callback(functools.partial(restart_cb, "nginx"))
+
+    def server_forever(self):
+
+        @asyncio.coroutine
+        def monitor():
+            while len(self.async_task_handlers) > 0:
+                done, pending = yield from asyncio.wait(self.async_task_handlers, return_when=asyncio.FIRST_COMPLETED)
+                to_del = []
+                for i in range(0, len(self.async_task_handlers)):
+                    for task in done:
+                        if task == self.async_task_handlers[i]:
+                            to_del.append(i)
+
+                for i in to_del:
+                    del self.async_task_handlers[i]
+
+        self.ev_loop.run_until_complete(monitor())
+        print("INFO: BlackPearl service was shutdown")
 
     def reload_conf(self):
         self.uwsgi.reload_conf()
         self.nginx.reload_conf()
 
     def reload_code(self):
-        if self.status == "STARTED":
-            webapps_list = analyse_and_pickle_webapps(
-                "%s/uwsgi/pickle/webapps" % self.config.run,
-                *self.app_loc
-            )
-            self.afm.update_watch_path(rec=True)
-            if not webapps_list:
-                print("WARNING: Old code retained."
-                      " Modified code not redeployed.")
+        if self.reloading_code:
+            raise CodeReloadInProgressError("BlackPearl is already reloading the code.")
+        try:
+            self.reloading_code = True
+            if self.status == "STARTED":
+                webapps_list = analyse_and_pickle_webapps(
+                    "%s/uwsgi/pickle/webapps" % self.config.run,
+                    *self.app_loc
+                )
+                self.afm.update_watch_path(rec=True)
+                if not webapps_list:
+                    print("WARNING: Old code retained."
+                          " Modified code not redeployed.")
+                else:
+                    self.nginx.generate_conf_file(webapps_list)
+                    with open('%s/uwsgi/worker_reload.file' % self.uwsgi.run_loc, "w") as f:
+                        f.write("reload workers")
+                    self.nginx.reload_conf()
+                    print("INFO: Code updated.")
             else:
-                print("INFO: Code updated.")
-                self.nginx.generate_conf_file(webapps_list)
-                with open('%s/uwsgi/worker_reload.file' % self.uwsgi.run_loc, "w") as f:
-                    f.write("reload workers")
-                self.nginx.reload_conf()
-        else:
-            print("INFO: Server is in <%s> state. Ignoring restart request." % self.status)
+                print("INFO: Server is in <%s> state. Ignoring restart request." % self.status)
+        finally:
+            self.reloading_code = False
 
-        self.reload_code_called = False
-
-    def restart(self):
-        self.status = "RESTARTING"
-        asyncio.async(self.uwsgi.restart())
-        asyncio.async(self.nginx.restart())
-
-    def _status_modified_cb(self, service, status):
+    def _service_status_update_cb(self, service, status):
         other_service = 'uwsgi' if service == "nginx" else "nginx"
 
         if service == "uwsgi":
@@ -373,22 +457,23 @@ class AppServer():
                 if self.status != 'STOPPING':
                     print("SEVERE: %s service stopped unexpectedly" % service)
                     print("SEVERE: So, stopping %s service as well" % other_service)
-                    asyncio.async(other_service_obj.stop())
+                    self._async_task(other_service_obj.stop())
             else:
                 if self.status == "NOTSTARTED":
                     self.status = "TERMINATED"
                     print("ERROR: Failed to startup")
-                    asyncio.get_event_loop().stop()
 
                 elif self.status == "RESTARTING":
                     self.status = "TERMINATED"
                     print("INFO: Service restart failed.")
-                    asyncio.get_event_loop().stop()
 
                 elif self.status == "STOPPING":
                     self.status = "STOPPED"
                     print("INFO: Services stopped.")
-                    asyncio.get_event_loop().stop()
+
+                elif self.status in "STARTED":
+                    self.status = "TERMINATED"
+                    print("ERROR: Services terminated unexpectedly")
 
         elif status == "RESTARTING":
             print("INFO: Service <%s> getting restarted." % service)
@@ -407,17 +492,15 @@ class AppServer():
 
         return True
 
-    def _code_modified_cb(self, event):
+    def _code_update_cb(self, event):
         if os.path.isdir(event.pathname) or event.pathname.endswith(".py"):
             print("INFO: File<%s> modified." % event.pathname)
-            if not self.reload_code_called:
-                self.reload_code_called = True
-                ev_loop = asyncio.get_event_loop()
-                ev_loop.call_later(1, self.reload_code)
+            if not self.reloading_code:
+                self.ev_loop.call_later(1, self.reload_code)
 
 
 def start(config, daemon=False):
-    print("Performing precheck .... ", end="")
+    print("Performing prechecks .... ", end="")
     try:
         prechecks.check_all()
     except Exception as e:
@@ -466,49 +549,26 @@ def start(config, daemon=False):
                 os.dup2(w.fileno(), 2)
                 print("INFO: Starting BlackPearl in daemon mode ...")
 
+        # Initializing logger
         logger = Logger(Logger.INFO)
         logger.initialize()
+
+        # Writing BlackPearl PID to file
         with open(config.run + "/BlackPearl.pid", "w") as f:
             f.write(str(os.getpid()))
 
-        app_loc = [config.webapps]
+        app_server = AppServer(config)
+        # Creates the event loop and will wait till the server stops
+        app_server.start()
 
-        if config.adminapps_enabled:
-            app_loc.append(config.adminapps)
 
-        if config.builtinapps_enabled:
-            app_loc.append(config.builtinapps)
+class NoApplicationDeployedError(Exception):
+    pass
 
-        webapps_list = analyse_and_pickle_webapps(
-            "%s/uwsgi/pickle/webapps" % config.run,
-            *app_loc
-        )
-        if not webapps_list:
-            print("SEVERE: No application deployed.")
-            sys.exit(1)
 
-        ev_loop = asyncio.get_event_loop()
+class CodeReloadInProgressError(Exception):
+    pass
 
-        app_server = AppServer(config, webapps_list)
 
-        ev_loop.call_soon(app_server.start)
-
-        def signal_handler(signum):
-            print('Received signal : ', signum)
-            if signum in (signal.SIGTERM, signal.SIGINT, signal.SIGABRT):
-                print("INFO: Stopping BlackPearl service")
-                app_server.stop()
-            elif signum == signal.SIGHUP:
-                print("INFO: Redeploy BlackPearl")
-                app_server.reload_conf()
-            else:
-                print("INFO: Ignoring signal")
-
-        for signame in ('SIGINT', 'SIGTERM', 'SIGABRT', 'SIGHUP'):
-            sig = getattr(signal, signame)
-            ev_loop.add_signal_handler(sig, functools.partial(signal_handler, sig))
-
-        try:
-            ev_loop.run_forever()
-        except:
-            ev_loop.close()
+class ConfReloadInProgressError(Exception):
+    pass

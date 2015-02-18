@@ -28,6 +28,8 @@ class AsyncFileMonitor(pyinotify.Notifier):
                                     threshold, timeout)
         if not loop:
             self.loop = asyncio.get_event_loop()
+        else:
+            self.loop = loop
         self.loop.add_reader(self._fd, self._events_ready)
         self.wdd = None
         self.path = None

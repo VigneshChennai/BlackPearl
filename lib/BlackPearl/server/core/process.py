@@ -19,7 +19,7 @@ import sys
 import asyncio
 import signal
 import traceback
-
+import inspect
 import os
 
 
@@ -56,23 +56,28 @@ class Process:
 
     def _set_status(self, status):
         self._status = status
-        to_del = []
         for i in range(0, len(self.listeners)):
             try:
-                ret = self.listeners[i](status)
+                self.listeners[i](status)
             except:
                 print("ERROR : Error invoking status listener added to <%s> process" % self.name)
                 error = traceback.format_exc()
                 print("ERROR : %s" % error)
-            else:
-                if not ret:
-                    to_del.append(i)
-
-        for i in to_del:
-            del self.listeners[i]
 
     def add_status_listener(self, callback):
+        args = len(inspect.signature(callback).parameters)
+        if args != 1:
+            error = "The callback function should have 1 argument but passed function has %s" % args
+            print("INFO: %s" % error)
+            raise ValueError(error)
         self.listeners.append(callback)
+
+    def remove_status_listener(self, callback):
+        for i in range(0, len(self.listeners)):
+            if self.listeners[i] == callback:
+                del self.listeners[i]
+                return True
+        return False
 
     @asyncio.coroutine
     def start(self):
@@ -103,7 +108,7 @@ class Process:
                 if self._status != "RESTARTING":
                     self._set_status("TERMINATED")
             else:
-                print("INFO: Process <%s> stopped gracefully." % (
+                print("INFO: Process <%s> stopped." % (
                     self.name))
                 if self._status != "RESTARTING":
                     self._set_status("STOPPED")
