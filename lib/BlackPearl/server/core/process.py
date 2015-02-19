@@ -20,10 +20,8 @@ import asyncio
 import signal
 import traceback
 import inspect
-import os
 
 from enum import Enum
-
 
 _process = []
 
@@ -157,7 +155,7 @@ class Process:
     def _is_running(self):
         if self.process and self.process.pid >= 0:
             try:
-                os.kill(self.process.pid, 0)
+                self.process.send_signal(0)
                 return True
             except:
                 return False
@@ -180,7 +178,7 @@ class Process:
                 print("ERROR: Process <%s> is already stopped."
                       " Ignoring stop request" % self.name)
                 return False
-            os.kill(self.process.pid, signal.SIGINT)
+            self.process.send_signal(signal.SIGINT)
             yield from self._is_stopped(timeout)
             if self._is_running():
                 print("ERROR: Process <%s> not stopped with "
@@ -204,7 +202,7 @@ class Process:
                 print("ERROR: Process <%s> is already stopped."
                       " Ignoring stop request" % self.name)
                 return False
-            os.kill(self.process.pid, signal.SIGTERM)
+            self.process.send_signal(signal.SIGTERM)
             yield from self._is_stopped()
             if self._is_running():
                 print("ERROR: Process <%s> not stopped with "
@@ -221,7 +219,7 @@ class Process:
             print("ERROR: Process <%s> is already stopped."
                   " Ignoring stop request" % self.name)
             return False
-        os.kill(self.process.pid, signal.SIGKILL)
+        self.process.send_signal(signal.SIGKILL)
         return True
 
     def send_signal(self, sig):
@@ -229,7 +227,7 @@ class Process:
             print("ERROR: Process <%s> is already stopped."
                   " Ignoring stop request" % self.name)
             return False
-        os.kill(self.process.pid, sig)
+        self.process.send_signal(sig)
         return True
 
 
