@@ -260,6 +260,8 @@ Status = Enum("Status", "NOTSTARTED, STARTING, STARTFAILED, STARTED, STOPPING, R
 
 class AppServer():
 
+    # Instance Variables : config, status, reloading_code, reloading_conf,
+    #                      async_task_handlers, webapp_locations, ev_loop, uwsgi, nginx
     def __init__(self, config):
         self.config = config
 
@@ -268,23 +270,23 @@ class AppServer():
         self.reloading_conf = False
         self.async_task_handlers = []
 
-        app_loc = [config.webapps]
+        webapp_locations = [config.webapps]
         if config.adminapps_enabled:
-            app_loc.append(config.adminapps)
+            webapp_locations.append(config.adminapps)
 
         if config.builtinapps_enabled:
-            app_loc.append(config.builtinapps)
+            webapp_locations.append(config.builtinapps)
 
         webapps_list = analyse_and_pickle_webapps(
             "%s/uwsgi/pickle/webapps" % config.run,
-            *app_loc
+            *webapp_locations
         )
 
         if not webapps_list:
             print("SEVERE: No application deployed.")
             raise NoApplicationDeployedError("No application deployed")
 
-        self.app_loc = app_loc
+        self.webapp_locations = webapp_locations
 
         # Asyncio the event loop
         self.ev_loop = None
@@ -292,7 +294,7 @@ class AppServer():
         self.uwsgi = Uwsgi(
             config.uwsgi, config.home + "/lib/wsgi.py", config.run + "/uwsgi/uwsgi.sock",
             config.logs, config.run, config.security_key, config.security_block_size, config.listen,
-            [config.lib] + app_loc, config.uwsgi_options
+            [config.lib] + webapp_locations, config.uwsgi_options
         )
         self.uwsgi.generate_conf_file()
 
@@ -307,9 +309,9 @@ class AppServer():
         self.uwsgi.add_status_listener(functools.partial(self._service_status_update_cb, "uwsgi"))
 
     def _code_update_monitor_init(self):
-        print("INFO: Watching <%s> paths for file modifications." % str(self.app_loc))
-        paths = self.app_loc
-        excl = pyinotify.ExcludeFilter([al + "/*/static" for al in self.app_loc])
+        print("INFO: Watching <%s> paths for file modifications." % str(self.webapp_locations))
+        paths = self.webapp_locations
+        excl = pyinotify.ExcludeFilter([al + "/*/static" for al in self.webapp_locations])
         self.afm = fileutils.AsyncFileMonitor(self._code_update_cb, loop=self.ev_loop)
         self.afm.set_watch_path(paths, rec=True, exclude_filter=excl)
 
@@ -422,7 +424,7 @@ class AppServer():
             if self.status == Status.STARTED:
                 webapps_list = analyse_and_pickle_webapps(
                     "%s/uwsgi/pickle/webapps" % self.config.run,
-                    *self.app_loc
+                    *self.webapp_locations
                 )
                 self.afm.update_watch_path(rec=True)
                 if not webapps_list:
@@ -499,6 +501,43 @@ class AppServer():
                 self.ev_loop.call_later(1, self.reload_code)
 
 
+# From my gist - https://gist.github.com/VigneshChennai/35bb64d41e4a4beb2225
+def daemonize(log_folder, wd="/", umask=0):
+    try:
+        f = os.fork()
+    except OSError as e:
+        print("SEVERE: Error forking.. <{fork}>".format(fork=e))
+        print("SEVERE: Trace -> {trace}".format(
+            trace=traceback.format_exc()))
+        raise e from None
+
+    if f != 0:
+        sys.exit(0)
+    else:
+        signal.signal(signal.SIGHUP, lambda x, y: print("SIGHUP received during process forking, ignoring signal"))
+        os.chdir(wd)
+        os.setsid()
+        os.umask(umask)
+        try:
+            f = os.fork()
+        except OSError as e:
+            print("SEVERE: Error forking.. <{fork}>".format(fork=e))
+            print("SEVERE: Trace -> {trace}".format(
+                trace=traceback.format_exc()))
+            raise e from None
+
+        if f != 0:
+            sys.exit(0)
+
+        print("INFO: Started as Daemon")
+        r = open("/dev/null", "r")
+        os.dup2(r.fileno(), 0)
+        buffering = 1  # line buffering
+        w = open(log_folder, "w", buffering=buffering)
+        os.dup2(w.fileno(), 1)
+        os.dup2(w.fileno(), 2)
+
+
 def start(config, daemon=False):
     print("Performing prechecks .... ", end="")
     try:
@@ -507,47 +546,16 @@ def start(config, daemon=False):
         print("[Failed]")
         print("SEVERE: %s" % str(e))
         print("BlackPearl server not started ....")
-
         sys.exit(-1)
     else:
         print("[Ok]")
         if daemon:
+            print("INFO: Starting BlackPearl in daemon mode ...")
             try:
-                f = os.fork()
-            except OSError as e:
-                print("SEVERE: Error forking.. <{fork}>".format(fork=e))
-                print("SEVERE: Trace -> {trace}".format(
-                    trace=traceback.format_exc()))
+                daemonize(log_folder=config.logs + "/server.log")
+            except OSError:
+                print("ERROR: Unable to start the server in daemon mode. Exiting.")
                 sys.exit(1)
-
-            if f != 0:
-                print("\nINFO: BlackPearl server is invoked to start as daemon\n")
-                sys.exit(0)
-            else:
-                signal.signal(signal.SIGHUP,
-                              lambda x, y: print("SIGHUP received during process"
-                                                 " forking, ignoring signal"))
-                os.chdir("/")
-                os.setsid()
-                os.umask(0)
-                try:
-                    f = os.fork()
-                except OSError as e:
-                    print("SEVERE: Error forking.. <{fork}>".format(fork=e))
-                    print("SEVERE: Trace -> {trace}".format(
-                        trace=traceback.format_exc()))
-                    sys.exit(0)
-                if f != 0:
-                    sys.exit(0)
-
-                r = open("/dev/null", "r")
-                os.dup2(r.fileno(), 0)
-                buffering = 1  # line buffering
-                w = open(config.logs + "/server.log", "w",
-                         buffering=buffering)
-                os.dup2(w.fileno(), 1)
-                os.dup2(w.fileno(), 2)
-                print("INFO: Starting BlackPearl in daemon mode ...")
 
         # Initializing logger
         logger = Logger(Logger.INFO)
