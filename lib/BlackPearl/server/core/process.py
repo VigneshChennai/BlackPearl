@@ -22,6 +22,8 @@ import traceback
 import inspect
 import os
 
+from enum import Enum
+
 
 _process = []
 
@@ -35,14 +37,17 @@ def delete_process(process):
         if _process[i] == process:
             del _process[i]
 
+Status = Enum("Status", "NOTSTARTED, STARTING, STARTFAILED, STARTED, STOPPING, RESTARTING, STOPPED, TERMINATED")
+
 
 class Process:
+
     def __init__(self, name, command, env=None):
         self.name = name
         self.command = command
         self.process = None
         self.process_stop_event = asyncio.Event()
-        self._status = "NOTSTARTED"
+        self._status = Status.NOTSTARTED
         if env:
             self.env = env
         else:
@@ -81,16 +86,23 @@ class Process:
 
     @asyncio.coroutine
     def start(self):
-        if not (self._status == 'NOTSTARTED' or self._status == 'STOPPED'
-                or self._status == 'TERMINATED' or self._status == 'STARTFAILED'
-                or self._status == 'RESTARTING'):
-            raise InvalidState("ERROR: Process <%s> is in <%s>."
-                               " The process can be started only while it "
-                               "in <NOTSTARTED or STOPPED or TERMINATED or STARTFAILED, RESTARTING> state"
-                               % (self.name, self._status))
+        if not (self._status == Status.NOTSTARTED or self._status == Status.STOPPED
+                or self._status == Status.TERMINATED or self._status == Status.STARTFAILED
+                or self._status == Status.RESTARTING):
+            raise InvalidState(
+                "ERROR: Process <%s> is in <%s>."
+                " The process can be started only while it "
+                "in <%s> state" % (
+                    self.name, self._status.name,
+                    "%s, %s, %s, %s or %s" % (
+                        Status.NOTSTARTED.name, Status.STOPPED.name, Status.TERMINATED.name,
+                        Status.STARTFAILED.name, Status.RESTARTING.name
+                    )
+                )
+            )
         try:
             add_process(self)
-            self._set_status('STARTING')
+            self._set_status(Status.STARTING)
             inull = open("/dev/null", "r")
 
             self.process_stop_event.clear()
@@ -100,30 +112,30 @@ class Process:
                 env=self.env
             )
 
-            self._set_status("STARTED")
+            self._set_status(Status.STARTED)
             s = yield from self.process.wait()
             if s != 0:
                 print("ERROR: Process <%s> terminated "
                       "with non zero return code <%s>." % (self.name, s))
-                if self._status != "RESTARTING":
-                    self._set_status("TERMINATED")
+                if self._status != Status.RESTARTING:
+                    self._set_status(Status.TERMINATED)
             else:
                 print("INFO: Process <%s> stopped." % (
                     self.name))
-                if self._status != "RESTARTING":
-                    self._set_status("STOPPED")
+                if self._status != Status.RESTARTING:
+                    self._set_status(Status.STOPPED)
         except Exception as e:
             error = traceback.format_exc()
             print("ERROR: %s" % e)
             print("ERROR: %s" % error)
-            self._set_status("STARTFAILED")
+            self._set_status(Status.STARTFAILED)
         finally:
             self.process_stop_event.set()
             delete_process(self)
 
     @asyncio.coroutine
     def restart(self):
-        self._set_status("RESTARTING")
+        self._set_status(Status.RESTARTING)
         try:
             yield from self.stop()
             yield from self.start()
@@ -134,11 +146,11 @@ class Process:
             return
 
     def is_running(self):
-        if self._status == 'STOPPING':
+        if self._status == Status.STOPPING:
             return True
-        if self._status == 'RESTARTING':
+        if self._status == Status.RESTARTING:
             raise NotRestartedYet("ERROR: %s is restarting" % self.name)
-        if self._status == "NOTSTARTED":
+        if self._status == Status.NOTSTARTED:
             raise NotStartedYet("ERROR: %s not started yet" % self.name)
         return self._is_running()
 
@@ -161,9 +173,9 @@ class Process:
 
     @asyncio.coroutine
     def stop(self, timeout=15):
-        if self._status == 'STARTED' or self._status == 'RESTARTING':
-            if self._status != 'RESTARTING':
-                self._set_status('STOPPING')
+        if self._status == Status.STARTED or self._status == Status.RESTARTING:
+            if self._status != Status.RESTARTING:
+                self._set_status(Status.STOPPING)
             if not self._is_running():
                 print("ERROR: Process <%s> is already stopped."
                       " Ignoring stop request" % self.name)
@@ -176,14 +188,18 @@ class Process:
                 self.kill()
             return True
         else:
-            raise InvalidState("ERROR: Process <%s> is in <%s>."
-                               " The process can be stopped only while it "
-                               "in <STARTED or RESTARTING> state" % (self.name, self._status))
+            raise InvalidState(
+                "ERROR: Process <%s> is in <%s>."
+                " The process can be stopped only while it "
+                "in <%s or %s> state" % (
+                    self.name, self._status, Status.STARTED.name, Status.RESTARTING.name
+                )
+            )
 
     @asyncio.coroutine
     def terminate(self):
-        if self._status == 'STARTED':
-            self._set_status('STOPPING')
+        if self._status == Status.STARTED:
+            self._set_status(Status.STOPPING)
             if not self._is_running():
                 print("ERROR: Process <%s> is already stopped."
                       " Ignoring stop request" % self.name)
@@ -198,7 +214,7 @@ class Process:
         else:
             raise InvalidState("ERROR: Process <%s> is in <%s>."
                                " The process can be terminated only while it "
-                               "in <STARTED> state" % (self.name, self._status))
+                               "in <%s> state" % (self.name, self._status, Status.STARTED))
 
     def kill(self):
         if not self._is_running():

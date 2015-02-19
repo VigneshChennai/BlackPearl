@@ -26,11 +26,13 @@ import functools
 
 import pyinotify
 
+from BlackPearl.server.core import process
 from BlackPearl.server.core.process import Process, NotStartedYet, NotRestartedYet
 from BlackPearl.server.utils import prechecks, fileutils
 from BlackPearl.server.core.logger import Logger
 from BlackPearl.core import webapps as webapps
 
+from enum import Enum
 
 class WebAppMinimal:
     def __init__(self, location, url_prefix):
@@ -253,12 +255,15 @@ class Nginx(Process):
             f.write(conf)
 
 
+Status = Enum("Status", "NOTSTARTED, STARTING, STARTFAILED, STARTED, STOPPING, RESTARTING, STOPPED, TERMINATED")
+
+
 class AppServer():
 
     def __init__(self, config):
         self.config = config
 
-        self.status = "NOTSTARTED"
+        self.status = Status.NOTSTARTED
         self.reloading_code = False
         self.reloading_conf = False
         self.async_task_handlers = []
@@ -296,9 +301,6 @@ class AppServer():
             config.run, config.share, config.logs
         )
         self.nginx.generate_conf_file(webapps_list)
-
-        self._uwsgi_status = "NOTSTARTED"
-        self._nginx_status = "NOTSTARTED"
 
         # Defining service status change listener
         self.nginx.add_status_listener(functools.partial(self._service_status_update_cb, "nginx"))
@@ -361,7 +363,7 @@ class AppServer():
             self.server_forever()
 
     def stop(self):
-        self.status = "STOPPING"
+        self.status = Status.STOPPING
 
         def stop_cb(service, future):
             try:
@@ -376,7 +378,7 @@ class AppServer():
         self._async_task(self.nginx.stop()).add_done_callback(functools.partial(stop_cb, "nginx"))
 
     def restart(self):
-        self.status = "RESTARTING"
+        self.status = Status.RESTARTING
 
         def restart_cb(service, future):
             try:
@@ -390,23 +392,23 @@ class AppServer():
         self._async_task(self.uwsgi.restart()).add_done_callback(functools.partial(restart_cb, "uwsgi"))
         self._async_task(self.nginx.restart()).add_done_callback(functools.partial(restart_cb, "nginx"))
 
-    def server_forever(self):
+    @asyncio.coroutine
+    def server_forever_async(self):
+        while len(self.async_task_handlers) > 0:
+            done, pending = yield from asyncio.wait(self.async_task_handlers, return_when=asyncio.FIRST_COMPLETED)
+            to_del = []
+            for i in range(0, len(self.async_task_handlers)):
+                for task in done:
+                    if task == self.async_task_handlers[i]:
+                        to_del.append(i)
 
-        @asyncio.coroutine
-        def monitor():
-            while len(self.async_task_handlers) > 0:
-                done, pending = yield from asyncio.wait(self.async_task_handlers, return_when=asyncio.FIRST_COMPLETED)
-                to_del = []
-                for i in range(0, len(self.async_task_handlers)):
-                    for task in done:
-                        if task == self.async_task_handlers[i]:
-                            to_del.append(i)
+            for i in to_del:
+                del self.async_task_handlers[i]
 
-                for i in to_del:
-                    del self.async_task_handlers[i]
-
-        self.ev_loop.run_until_complete(monitor())
         print("INFO: BlackPearl service was shutdown")
+
+    def server_forever(self):
+        self.ev_loop.run_until_complete(self.server_forever_async())
 
     def reload_conf(self):
         self.uwsgi.reload_conf()
@@ -417,7 +419,7 @@ class AppServer():
             raise CodeReloadInProgressError("BlackPearl is already reloading the code.")
         try:
             self.reloading_code = True
-            if self.status == "STARTED":
+            if self.status == Status.STARTED:
                 webapps_list = analyse_and_pickle_webapps(
                     "%s/uwsgi/pickle/webapps" % self.config.run,
                     *self.app_loc
@@ -441,53 +443,51 @@ class AppServer():
         other_service = 'uwsgi' if service == "nginx" else "nginx"
 
         if service == "uwsgi":
-            self._uwsgi_status = status
-            other_status = self._nginx_status
+            other_status = self.nginx.status
             service_obj = self.uwsgi
             other_service_obj = self.nginx
         else:
-            self._nginx_status = status
-            other_status = self._uwsgi_status
+            other_status = self.uwsgi.status
             service_obj = self.nginx
             other_service_obj = self.uwsgi
 
-        if status in ("STOPPED", "TERMINATED"):
+        if status in (process.Status.STOPPED, process.Status.TERMINATED, process.Status.STARTFAILED):
 
-            if other_status not in ("STOPPED", "TERMINATED"):
-                if self.status != 'STOPPING':
+            if other_status not in (process.Status.STOPPED, process.Status.TERMINATED, process.Status.STARTFAILED):
+                if self.status != Status.STOPPING:
                     print("SEVERE: %s service stopped unexpectedly" % service)
                     print("SEVERE: So, stopping %s service as well" % other_service)
                     self._async_task(other_service_obj.stop())
             else:
-                if self.status == "NOTSTARTED":
-                    self.status = "TERMINATED"
+                if self.status == Status.NOTSTARTED:
+                    self.status = Status.TERMINATED
                     print("ERROR: Failed to startup")
 
-                elif self.status == "RESTARTING":
-                    self.status = "TERMINATED"
+                elif self.status == Status.RESTARTING:
+                    self.status = Status.TERMINATED
                     print("INFO: Service restart failed.")
 
-                elif self.status == "STOPPING":
-                    self.status = "STOPPED"
+                elif self.status == Status.STOPPING:
+                    self.status = Status.STOPPED
                     print("INFO: Services stopped.")
 
-                elif self.status in "STARTED":
-                    self.status = "TERMINATED"
+                elif self.status == Status.STARTED:
+                    self.status = Status.TERMINATED
                     print("ERROR: Services terminated unexpectedly")
 
-        elif status == "RESTARTING":
+        elif status == process.Status.RESTARTING:
             print("INFO: Service <%s> getting restarted." % service)
 
-        elif status == "STARTED" and other_status == "STARTED":
+        elif status == process.Status.STARTED and other_status == process.Status.STARTED:
             print("INFO: Service <%s> started up." % service)
-            if self.status == "RESTARTING":
-                self.status = "STARTED"
+            if self.status == Status.RESTARTING:
+                self.status = Status.STARTED
                 print("INFO: Services restarted.")
-            elif self.status != "STARTED":
-                self.status = "STARTED"
+            elif self.status != Status.STARTED:
+                self.status = Status.STARTED
                 print("INFO: Services started up")
 
-        elif status == "STARTED":
+        elif status == process.Status.STARTED:
             print("INFO: Service <%s> started up." % service)
 
         return True
