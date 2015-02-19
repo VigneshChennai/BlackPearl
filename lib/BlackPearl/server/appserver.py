@@ -23,16 +23,16 @@ import multiprocessing
 import pickle
 import os
 import functools
-
 import pyinotify
 
+from enum import Enum
+
 from BlackPearl.server.core import process
-from BlackPearl.server.core.process import Process, NotStartedYet, NotRestartedYet
+from BlackPearl.server.core.process import Process
 from BlackPearl.server.utils import prechecks, fileutils
 from BlackPearl.server.core.logger import Logger
 from BlackPearl.core import webapps as webapps
 
-from enum import Enum
 
 class WebAppMinimal:
     def __init__(self, location, url_prefix):
@@ -40,18 +40,18 @@ class WebAppMinimal:
         self.url_prefix = url_prefix
 
 
-def analyse_and_pickle_webapps(picklefile, *appdirs):
+def analyse_and_pickle_webapps(pickle_file, *app_dirs):
     def analyser(queue):
         try:
             webapps_list = []
             print("INFO: Analysing deployed webapps ....")
-            for appdir in appdirs:
-                temp = webapps.initialize(appdir)
+            for app_dir in app_dirs:
+                temp = webapps.initialize(app_dir)
                 if temp:
                     webapps_list.extend(temp)
             print("INFO: Webapps analysing completed.")
-            print("INF0: Writing analysed information to <%s>" % picklefile)
-            with open(picklefile, "wb") as pfile:
+            print("INF0: Writing analysed information to <%s>" % pickle_file)
+            with open(pickle_file, "wb") as pfile:
                 pickle.dump(webapps_list, pfile)
             print("INFO: Write completed")
             _webapps = []
