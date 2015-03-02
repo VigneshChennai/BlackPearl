@@ -171,20 +171,19 @@ def __application__(environ, start_response):
 def initialize():
     global modules, deployed_webapps
     # initializing the webapps from the pickled file.
-    run = os.environ["BLACKPEARL_RUN"]
     security.BLOCK_SIZE = int(os.environ['BLACKPEARL_ENCRYPT_BLOCK_SIZE'])
     security.AES_KEY = base64.b64decode(os.environ['BLACKPEARL_ENCRYPT_KEY'])
     testing.listen = os.environ['BLACKPEARL_LISTEN']
-    pfile = open("%s/uwsgi/pickle/webapps" % run, "rb")
+    pickle_file = os.environ['BLACKPEARL_PICKLE_FILE']
+    pfile = open("%s" % pickle_file, "rb")
     with pfile:
-        deployed_webapps = pickle.load(pfile)
+        webapp = pickle.load(pfile)
 
     # We are generating signature object during initialization because, signature
     # object is not picklable
-    for webapp in deployed_webapps:
-        for url, webmodule in webapp.webmodules.items():
-            modules[url] = webapp
-            webmodule["signature"] = inspect.signature(webmodule["handler"])
+    for url, webmodule in webapp.webmodules.items():
+        modules[url] = webapp
+        webmodule["signature"] = inspect.signature(webmodule["handler"])
 
 
 # This "application" is called for every request by the app_server (uwsgi)

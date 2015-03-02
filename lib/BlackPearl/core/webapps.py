@@ -302,7 +302,13 @@ class NotEnabledError(Exception):
     pass
 
 
-def initialize(location):
+def get_webapp_folders(location):
+    if not os.access(location, os.F_OK):
+        print("WARNING: Webapps folder<%s> not found. Ignoring.. " % location)
+    return [name for name in os.listdir(location) if os.path.isdir(location + os.path.sep + name)]
+
+
+def analyze(location, webapp_folder):
     """Initializes the web applications"""
     if not os.access(location, os.F_OK):
         print("WARNING: Webapps folder<%s> not found. Ignoring.. " % location)
@@ -311,23 +317,17 @@ def initialize(location):
     print("INFO: Adding <%s> to python path." % location)
     sys.path.append(location)
 
-    webapps_folder = [name for name in os.listdir(location)
-                      if os.path.isdir(location + os.path.sep + name)]
-    print("INFO: List of webapps folder present in the given path <%s>." + str(webapps_folder))
-    webapps = []
-    for webapp_folder in webapps_folder:
-        try:
-            webapp = Webapp(location, webapp_folder)
-            if webapp.initialize():
-                webapps.append(webapp)
-            else:
-                print("SEVERE: Ignoring the webapp")
-        except NotEnabledError:
-            print("INFO: Ignoring <%s> as is it disabled in configuration file")
-        except:
-            traceback.print_exc()
-            print("Error initializing : %s" % webapp_folder)
+    print("INFO: Adding <%s/%s/lib> to python path." % (location, webapp_folder))
+    sys.path.append(location + webapp_folder + "/lib")
 
-    print("INFO: Webapps deployed at <%s> initialized" % location)
-    print("INFO: List of initialized webapps : %s" % webapps)
-    return webapps
+    try:
+        webapp = Webapp(location, webapp_folder)
+        if webapp.initialize():
+            return webapp
+        else:
+            print("SEVERE: Ignoring the webapp")
+    except NotEnabledError:
+        print("INFO: Ignoring <%s> as is it disabled in configuration file")
+    except:
+        traceback.print_exc()
+        print("Error initializing : %s" % webapp_folder)
