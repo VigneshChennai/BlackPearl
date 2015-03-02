@@ -17,6 +17,7 @@
 
 
 import json
+import functools
 
 
 class Serialize:
@@ -26,20 +27,27 @@ class Serialize:
         return self.__dict__
 
 
-def dumper(obj):
-    return obj.to_json()
+def dumper(obj, skip_non_serializable=False):
+    if skip_non_serializable:
+        try:
+            return obj.to_json()
+        except:
+            return "NonSerializable object"
+    else:
+        return obj.to_json()
 
 
-def dumps(obj):
+def dumps(obj, skip_non_serializable=False):
     try:
-        return json.dumps(obj, default=dumper, sort_keys=True)
+        return json.dumps(obj, default=functools.partial(dumper, skip_non_serializable=skip_non_serializable), sort_keys=True)
     except:
         raise ValueError("The object <%s> is not Serializable." % obj) from None
 
 
-def dump(obj, json_file):
+def dump(obj, json_file, skip_non_serializable=False):
     try:
-        return json.dump(obj, json_file, default=dumper, sort_keys=True)
+        return json.dump(obj, json_file, default=functools.partial(dumper, skip_non_serializable=skip_non_serializable),
+                         sort_keys=True)
     except:
         raise ValueError("The object <%s> is not Serializable." % obj) from None
 
