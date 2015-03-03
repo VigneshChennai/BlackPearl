@@ -119,6 +119,34 @@ def validate_parameter(signature, parameter):
     return updated_args
 
 
+def get_signature_details(function):
+    _signature = inspect.signature(function)
+
+    ret = []
+    for arg, value in _signature.parameters.items():
+        v = {
+            "arg": arg,
+            "type": None,
+            "type_def": None,
+        }
+
+        annotation = value.annotation
+
+        if annotation is not inspect.Signature.empty:
+            v['type'] = repr(value.annotation)
+
+        if isinstance(annotation, datatype.Format) or isinstance(annotation, datatype.FormatList):
+            v["type_def"] = annotation.data_format
+
+        elif (isinstance(annotation, datatype.Options)
+              or isinstance(annotation, datatype.OptionsList)):
+            v["type_def"] = annotation.values
+
+        ret.append(v)
+
+    return ret
+
+
 def fixurl(url):
     url_seg = []
     for segment in url.split('/'):
@@ -126,3 +154,44 @@ def fixurl(url):
         if len(segment) != 0:
             url_seg.append(segment)
     return "/" + "/".join(url_seg)
+
+
+def is_primitive(obj):
+    if hasattr(obj, "__dict__"):
+        return False
+    return True
+
+
+def remove_non_primitive_objects(obj):
+    if not is_primitive(obj):
+        return repr(obj)
+
+    if type(obj) is str:
+        return obj
+
+    if type(obj) is dict:
+        o = {}
+        for key, value in obj.items():
+            key = remove_non_primitive_objects(key)
+            value = remove_non_primitive_objects(value)
+            o[key] = value
+        return o
+
+    if hasattr(obj, "__iter__"):
+        o = []
+        for i in obj:
+            o.append(remove_non_primitive_objects(i))
+        return o
+
+    return obj
+
+
+class DictWrapper:
+    pass
+
+
+def dict_to_object(dictionary):
+    obj = DictWrapper()
+    for key, value in dictionary.items():
+        setattr(obj, key, value)
+    return obj

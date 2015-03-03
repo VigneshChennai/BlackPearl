@@ -21,9 +21,10 @@ import functools
 
 
 class Serialize:
-
+    def __init__(self):
+        self.__serializable__ = True
+        
     def to_json(self):
-        setattr(self, "__serialized__", True)
         return self.__dict__
 
 
@@ -53,7 +54,7 @@ def dump(obj, json_file, skip_non_serializable=False):
 
 
 def loader(dictionary):
-    if "__serialized__" in dictionary.keys():
+    if "__serializable__" in dictionary.keys():
         o = Serialize()
         for key, value in dictionary.items():
             setattr(o, key, value)
@@ -67,3 +68,9 @@ def loads(json_string):
 
 def load(json_file):
     return json.load(json_file, object_hook=loader)
+
+
+
+
+
+

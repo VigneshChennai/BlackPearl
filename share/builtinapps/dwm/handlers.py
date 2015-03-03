@@ -17,10 +17,9 @@
 
 import inspect
 
-from BlackPearl.core.decorators import weblocation, webname
+from BlackPearl.core.decorators import weblocation
 from BlackPearl import application
 from BlackPearl.core.exceptions import RequestInvalid
-from BlackPearl.core import datatype
 
 
 @weblocation('/applications')
@@ -47,7 +46,7 @@ def applications():
 
 @weblocation('/signature')
 def signature(url):
-    """Dummy entry"""
+    """Return the signature details of the url"""
     ret = []
 
     try:
@@ -55,29 +54,8 @@ def signature(url):
     except:
         raise RequestInvalid("The URL <%s> not found" % url)
 
-    _signature = webapp.webmodules[url]['signature']
     desc = webapp.webmodules[url]['desc']
-
-    for arg, value in _signature.parameters.items():
-        v = {
-            "arg": arg,
-            "type": repr(value.annotation),
-            "type_def": None,
-        }
-
-        annotation = value.annotation
-
-        if annotation is inspect.Signature.empty:
-            v['type'] = None
-
-        if isinstance(annotation, datatype.Format) or isinstance(annotation, datatype.FormatList):
-            v["type_def"] = annotation.data_format
-
-        elif (isinstance(annotation, datatype.Options)
-              or isinstance(annotation, datatype.OptionsList)):
-            v["type_def"] = annotation.values
-
-        ret.append(v)
+    ret.extend(webapp.webmodules[url]['arguments'])
 
     ts = []
     try:
@@ -110,44 +88,4 @@ def testsets(url):
             "desc": testset['desc']
         })
 
-    return ret
-
-
-@weblocation('/testing/run')
-def run_testset(url, name):
-    try:
-        webapp = application.modules[url]
-    except:
-        raise RequestInvalid("The URL <%s> not found" % url)
-
-    _testset = None
-    _testsets = webapp.testsets[url]
-    for testset in _testsets:
-        if testset['name'] == name:
-            _testset = testset
-            break
-
-    if _testset:
-        return _testset['func']()
-    else:
-        raise RequestInvalid("The name <%s> not found" % name)
-
-
-@weblocation('/testing/run_all')
-def run_all_testset(url):
-    try:
-        webapp = application.modules[url]
-    except:
-        raise RequestInvalid("The URL <%s> not found" % url)
-
-    ret = []
-    try:
-        _testsets = webapp.testsets[url]
-    except KeyError:
-        raise RequestInvalid("No testsets found for url <%s>" % url)
-    for testset in _testsets:
-        ret.append({
-            "TestSet": testset['name'],
-            "data": testset['func']()
-        })
     return ret

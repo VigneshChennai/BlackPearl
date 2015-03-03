@@ -25,25 +25,14 @@ import os
 import functools
 import pyinotify
 
+
 from enum import Enum
 
 from BlackPearl.server.core import process
 from BlackPearl.server.core.process import Process, ProcessGroup
-from BlackPearl.server.utils import prechecks, fileutils
+from BlackPearl.server.utils import prechecks, fileutils, serialize
 from BlackPearl.server.core.logger import Logger
 from BlackPearl.core import webapps as webapps
-
-
-class WebAppMinimal:
-    def __init__(self, name, location, pickle_file, url_prefix):
-        self.name = name
-        self.location = location
-        self.url_prefix = url_prefix
-        self.pickle_file = pickle_file
-        self.socket = None
-
-    def set_socket(self, socket):
-        self.socket = socket
 
 
 def analyse_and_pickle_webapps(pickle_folder, *app_dirs):
@@ -54,13 +43,13 @@ def analyse_and_pickle_webapps(pickle_folder, *app_dirs):
 
             print("INFO: Webapp analysing completed.")
             print("INFO: Webapp details : %s" % webapp)
-            f = os.path.join(pickle_folder, webapp.name + ".pickle")
+            f = os.path.join(pickle_folder, webapp.id + ".pickle")
+            webapp.pickle_file = f
             print("INFO: Writing analysed information to file <%s>." % f)
             with open(f, "wb") as pickle_file:
                 pickle.dump(webapp, pickle_file)
             print("INFO: Write completed")
-            WebAppMinimal(webapp.name, webapp.location, f, webapp.url_prefix)
-            queue.put(WebAppMinimal(webapp.name, webapp.location, f, webapp.url_prefix))
+            queue.put(webapp.to_primitive())
         except:
             print("ERROR: Fatal error during analysing webapps.")
             print("ERROR: %s" % traceback.format_exc())
@@ -79,7 +68,12 @@ def analyse_and_pickle_webapps(pickle_folder, *app_dirs):
                 rets.append(ret)
             p.join()
         print("INFO: Webapps deployed at <%s> initialized" % app_dir)
+
     print("INFO: List of initialized webapps : %s" % webapps)
+    da_file = os.path.join(pickle_folder, "deployed_apps.pickle")
+    print("INFO: Writing all the analysed information to file <%s>." % da_file)
+    with open(da_file, "wb") as da_file:
+        pickle.dump(rets, da_file)
 
     return rets
 
@@ -113,9 +107,10 @@ class Uwsgi(ProcessGroup):
         self.uwsgi_options = uwsgi_options
 
         for webapp in webapps_list:
-            command = [self.uwsgi_loc, '--ini', "%s/uwsgi/uwsgi_%s.conf" % (self.run_loc, webapp.name)]
+            command = [self.uwsgi_loc, '--ini', "%s/uwsgi/%s.conf" % (self.run_loc, webapp.id)]
             self.add_process(name="'%s' uWsgi Service" % webapp.name, command=command,
                              env={
+                                 "BLACKPEARL_DEPLOYED_APPS": self.run_loc + "/uwsgi/pickle/deployed_apps.pickle",
                                  "BLACKPEARL_PICKLE_FILE": webapp.pickle_file,
                                  "BLACKPEARL_ENCRYPT_KEY": self.security_key,
                                  "BLACKPEARL_ENCRYPT_BLOCK_SIZE": str(self.security_block_size),
@@ -142,8 +137,8 @@ class Uwsgi(ProcessGroup):
             config = {
                 "socket": webapp.socket,
                 "wsgi-file": self.uwsgi_file,
-                "logto": '%s/uwsgi/%s.log' % (self.logs_dir, webapp.name),
-                "pidfile": '%s/uwsgi/uwsgi_%s.pid' % (self.run_loc, webapp.name),
+                "logto": '%s/uwsgi/%s.log' % (self.logs_dir, webapp.id),
+                "pidfile": '%s/uwsgi/%s.pid' % (self.run_loc, webapp.id),
                 "buffer-size": '32768',
                 # "touch-workers-reload": '%s/uwsgi/worker_reload_%s.file' % (self.run_loc, webapp.name)
                 #  "workers": str(multiprocessing.cpu_count()),
@@ -156,7 +151,7 @@ class Uwsgi(ProcessGroup):
             conf_list = [str(key) + " = " + str(value) for key, value in config.items()]
             conf_list.insert(0, "[uwsgi]")
 
-            with open("%s/uwsgi/uwsgi_%s.conf" % (self.run_loc, webapp.name), "w") as f:
+            with open("%s/uwsgi/%s.conf" % (self.run_loc, webapp.id), "w") as f:
                 f.write("\n".join(conf_list))
 
     def reload_conf(self):
@@ -302,7 +297,7 @@ class AppServer():
             raise NoApplicationDeployedError("No application deployed")
 
         for webapp in webapps_list:
-            webapp.set_socket(config.run + "/uwsgi/%s.socket" % webapp.name)
+            webapp.socket = config.run + "/uwsgi/%s.socket" % webapp.id
 
         self.webapp_locations = webapp_locations
 
@@ -436,7 +431,7 @@ class AppServer():
 
     def reload_code(self):
         return
-
+        # TODO: Need to fix this
         if self.reloading_code:
             raise CodeReloadInProgressError("BlackPearl is already reloading the code.")
         try:

@@ -29,6 +29,7 @@ class Webapp:
     """This class holds all the values corresponding to a web application"""
 
     def __init__(self, app_location, folder_name):
+        self.id = ""
         self.location = app_location + "/" + folder_name
         self.folder_name = folder_name
         self.name = None
@@ -112,6 +113,7 @@ class Webapp:
         try:
             self._init_handlers(config)
         except:
+            print("SEVERE: ", traceback.format_exc())
             return False
 
         try:
@@ -180,6 +182,8 @@ class Webapp:
         except AttributeError:
             self.url_prefix = "/" + self.folder_name
 
+        self.id = self.url_prefix[1:].replace("/","_")
+
         print("INFO: URL prefix <%s>" % self.url_prefix)
 
         try:
@@ -206,6 +210,7 @@ class Webapp:
             raise Exception("Error initializing handlers")
 
         count = 0
+        self.handlers.insert(0, "BlackPearl.core.handlers")
         for handler in self.handlers:
             try:
                 print("INFO: Initializing handler <%s>" % handler)
@@ -297,6 +302,9 @@ class Webapp:
                         if self._check_url(url, name, member):
                             self.webmodules[url] = webmodule
 
+    def to_primitive(self):
+        """Removes all the functions and objects, and wrapper it inside a object at the toplevel"""
+        return utils.dict_to_object(utils.remove_non_primitive_objects(self.__dict__))
 
 class NotEnabledError(Exception):
     pass
