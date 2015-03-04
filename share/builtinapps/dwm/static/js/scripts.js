@@ -312,9 +312,9 @@ function execute_testset(testset) {
     '</div> <div class="spinner-container container3"> <div class="circle1"></div> <div class="circle2"></div> ' +
     '<div class="circle3"></div> <div class="circle4"></div> </div></div></pre>');
     if (testset) {
-        url = "testing/run?url=" + _current_module +"&name=" + testset;
+        url = _applications[_current_app_id].url_prefix + "/__test_run__?url=" + _current_module +"&name=" + testset;
     } else {
-        url = "testing/run_all?url=" + _current_module;
+        url = _applications[_current_app_id].url_prefix + "/__test_run_all__?url=" + _current_module;
     }
 
     $.get(url, function(data) {

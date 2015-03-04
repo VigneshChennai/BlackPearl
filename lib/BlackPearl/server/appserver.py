@@ -69,7 +69,7 @@ def analyse_and_pickle_webapps(pickle_folder, *app_dirs):
             p.join()
         print("INFO: Webapps deployed at <%s> initialized" % app_dir)
 
-    print("INFO: List of initialized webapps : %s" % webapps)
+    print("INFO: List of initialized webapps : %s" % rets)
     da_file = os.path.join(pickle_folder, "deployed_apps.pickle")
     print("INFO: Writing all the analysed information to file <%s>." % da_file)
     with open(da_file, "wb") as da_file:
@@ -140,9 +140,9 @@ class Uwsgi(ProcessGroup):
                 "logto": '%s/uwsgi/%s.log' % (self.logs_dir, webapp.id),
                 "pidfile": '%s/uwsgi/%s.pid' % (self.run_loc, webapp.id),
                 "buffer-size": '32768',
-                # "touch-workers-reload": '%s/uwsgi/worker_reload_%s.file' % (self.run_loc, webapp.name)
-                #  "workers": str(multiprocessing.cpu_count()),
-                # "lazy-apps": 'true'
+                "touch-workers-reload": '%s/uwsgi/%s.reload' % (self.run_loc, webapp.id),
+                "workers": str(multiprocessing.cpu_count()),
+                "lazy-apps": 'true'
             }
             if virtenv:
                 config['home'] = virtenv
@@ -278,6 +278,7 @@ class AppServer():
         self.status = Status.NOTSTARTED
         self.reloading_code = False
         self.reloading_conf = False
+        self.modified_files = []
         self.async_task_handlers = []
 
         webapp_locations = [config.webapps]
@@ -430,25 +431,38 @@ class AppServer():
         self.nginx.reload_conf()
 
     def reload_code(self):
-        return
-        # TODO: Need to fix this
+
         if self.reloading_code:
             raise CodeReloadInProgressError("BlackPearl is already reloading the code.")
+
         try:
             self.reloading_code = True
+            yield from asyncio.sleep(2)
             if self.status == Status.STARTED:
                 webapps_list = analyse_and_pickle_webapps(
                     "%s/uwsgi/pickle/" % self.config.run,
                     *self.webapp_locations
                 )
+
                 self.afm.update_watch_path(rec=True)
                 if not webapps_list:
                     print("WARNING: Old code retained."
                           " Modified code not redeployed.")
                 else:
+                    modified_webapps = []
+                    for webapp in webapps_list:
+                        for modified_file in self.modified_files:
+                            if modified_file.startswith(webapp.location):
+                                modified_webapps.append(webapp)
+                    modified_webapps = set(modified_webapps)
+
+                    for webapp in webapps_list:
+                        webapp.socket = self.config.run + "/uwsgi/%s.socket" % webapp.id
+
                     self.nginx.generate_conf_file(webapps_list)
-                    with open('%s/uwsgi/worker_reload.file' % self.uwsgi.run_loc, "w") as f:
-                        f.write("reload workers")
+                    for m_webapp in modified_webapps:
+                        with open('%s/uwsgi/%s.reload' % (self.uwsgi.run_loc, m_webapp.id), "w") as f:
+                            f.write("reload workers")
                     self.nginx.reload_conf()
                     print("INFO: Code updated.")
             else:
@@ -512,8 +526,9 @@ class AppServer():
     def _code_update_cb(self, event):
         if os.path.isdir(event.pathname) or event.pathname.endswith(".py"):
             print("INFO: File<%s> modified." % event.pathname)
+            self.modified_files.append(event.pathname)
             if not self.reloading_code:
-                self.ev_loop.call_later(1, self.reload_code)
+                asyncio.async(self.reload_code())
 
 
 # From my gist - https://gist.github.com/VigneshChennai/35bb64d41e4a4beb2225

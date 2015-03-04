@@ -26,14 +26,19 @@ from BlackPearl.core.exceptions import RequestInvalid
 def applications():
     ret = []
     for app in application.deployed_webapps:
-        urls = [url for url in app.webmodules.keys()]
+        urls = []
+        for url in app.webmodules.keys():
+            if not url.split("/")[-1].startswith("_"):
+                urls.append(url)
         urls.sort()
+
         preprocessors = [preprocessor['name'] for preprocessor in app.preprocessors]
         preprocessors.sort(key=lambda prep: prep['name'])
         posthandlers = [posthandler['name'] for posthandler in app.posthandlers]
         posthandlers.sort(key=lambda post: post['name'])
         ret.append({
             "name": app.name,
+            "url_prefix": app.url_prefix,
             "description": app.desc,
             "modules": urls,
             "preprocessors": preprocessors,
@@ -89,3 +94,10 @@ def testsets(url):
         })
 
     return ret
+
+
+@weblocation("/testing/dummy")
+def dummy():
+    return {
+        "desc": "Dummy"
+    }
