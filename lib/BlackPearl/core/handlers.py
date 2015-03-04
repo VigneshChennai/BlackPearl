@@ -56,3 +56,54 @@ def run_all_testset(url):
             "data": testset['func']()
         })
     return ret
+
+
+@weblocation('/__application__')
+def this_app():
+    app = application.webapp
+    urls = []
+    for url in app.webmodules.keys():
+        if not url.split("/")[-1].startswith("_"):
+            urls.append(url)
+    urls.sort()
+
+    preprocessors = [preprocessor['name'] for preprocessor in app.preprocessors]
+    preprocessors.sort(key=lambda prep: prep['name'])
+    posthandlers = [posthandler['name'] for posthandler in app.posthandlers]
+    posthandlers.sort(key=lambda post: post['name'])
+    return {
+        "name": app.name,
+        "url_prefix": app.url_prefix,
+        "description": app.desc,
+        "modules": urls,
+        "preprocessors": preprocessors,
+        "posthandlers": posthandlers,
+        "handlers": app.handlers
+    }
+
+
+@weblocation('/__signature__')
+def signature(url):
+    """Return the signature details of the url"""
+    webapp = application.webapp
+
+    if url not in webapp.webmodules:
+        raise RequestInvalid("The URL <%s> not found" % url)
+
+    ts = []
+    try:
+        _testsets = webapp.testsets[url]
+    except:
+        pass
+    else:
+        for testset in _testsets:
+            ts.append({
+                "name": testset['name'],
+                "desc": testset['desc']
+            })
+
+    return {
+        "signature": webapp.webmodules[url]['arguments'],
+        "desc": webapp.webmodules[url]['desc'],
+        "testsets": ts
+    }

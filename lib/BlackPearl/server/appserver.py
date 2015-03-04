@@ -35,6 +35,15 @@ from BlackPearl.server.core.logger import Logger
 from BlackPearl.core import webapps as webapps
 
 
+class WebAppMinimal:
+    def __init__(self, webapp, pickle_file):
+        self.id = webapp.id
+        self.name = webapp.name
+        self.location = webapp.location
+        self.pickle_file = pickle_file
+        self.url_prefix = webapp.url_prefix
+
+
 def analyse_and_pickle_webapps(pickle_folder, *app_dirs):
     def analyser(location, folder, queue):
         try:
@@ -44,12 +53,12 @@ def analyse_and_pickle_webapps(pickle_folder, *app_dirs):
             print("INFO: Webapp analysing completed.")
             print("INFO: Webapp details : %s" % webapp)
             f = os.path.join(pickle_folder, webapp.id + ".pickle")
-            webapp.pickle_file = f
             print("INFO: Writing analysed information to file <%s>." % f)
             with open(f, "wb") as pickle_file:
                 pickle.dump(webapp, pickle_file)
             print("INFO: Write completed")
-            queue.put(webapp.to_primitive())
+
+            queue.put(WebAppMinimal(webapp, f))
         except:
             print("ERROR: Fatal error during analysing webapps.")
             print("ERROR: %s" % traceback.format_exc())
@@ -71,9 +80,12 @@ def analyse_and_pickle_webapps(pickle_folder, *app_dirs):
 
     print("INFO: List of initialized webapps : %s" % rets)
     da_file = os.path.join(pickle_folder, "deployed_apps.pickle")
-    print("INFO: Writing all the analysed information to file <%s>." % da_file)
+    print("INFO: Writing deployed apps information to file <%s>." % da_file)
+    data = []
+    for ret in rets:
+        data.append({"name" : ret.name, "url_prefix" : ret.url_prefix})
     with open(da_file, "wb") as da_file:
-        pickle.dump(rets, da_file)
+        pickle.dump(data, da_file)
 
     return rets
 
@@ -110,7 +122,7 @@ class Uwsgi(ProcessGroup):
             command = [self.uwsgi_loc, '--ini', "%s/uwsgi/%s.conf" % (self.run_loc, webapp.id)]
             self.add_process(name="'%s' uWsgi Service" % webapp.name, command=command,
                              env={
-                                 "BLACKPEARL_DEPLOYED_APPS": self.run_loc + "/uwsgi/pickle/deployed_apps.pickle",
+                                 "BLACKPEARL_DEPLOYED_APPS_PICKLE": "%s/uwsgi/pickle/deployed_apps.pickle" % run_loc,
                                  "BLACKPEARL_PICKLE_FILE": webapp.pickle_file,
                                  "BLACKPEARL_ENCRYPT_KEY": self.security_key,
                                  "BLACKPEARL_ENCRYPT_BLOCK_SIZE": str(self.security_block_size),

@@ -302,10 +302,6 @@ class Webapp:
                         if self._check_url(url, name, member):
                             self.webmodules[url] = webmodule
 
-    def to_primitive(self):
-        """Removes all the functions and objects, and wrapper it inside a object at the toplevel"""
-        return utils.dict_to_object(utils.remove_non_primitive_objects(self.__dict__))
-
 class NotEnabledError(Exception):
     pass
 

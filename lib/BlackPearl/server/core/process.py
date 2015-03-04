@@ -364,19 +364,13 @@ class ProcessGroup:
         self.status_listener_cb = callback
 
     def add_process(self, name, command, env=None):
-        if self._status != Status.NOTSTARTED:
-            raise InvalidState(
-                "ERROR: ProcessGroup <%s> is in <%s>."
-                " A process can be added only when the ProcessGroup is "
-                "in <%s> state" % (self.name, self._status, Status.NOTSTARTED.name)
-                )
-
         def set_process_status(status):
             self.processes[process] = status
             if status in (Status.STOPPED, Status.TERMINATED, Status.STARTFAILED) and self._status != Status.STOPPING:
-                if self.stop_all_on_one_crashed:
-                    print("WARNING: Stopping all the process in the ProcessGroup<%s>" % self.name)
-                    asyncio.async(self.stop())
+                if process in self.processes:
+                    if self.stop_all_on_one_crashed:
+                        print("WARNING: Stopping all the process in the ProcessGroup<%s>" % self.name)
+                        asyncio.async(self.stop())
 
             else:
                 if self._status == Status.STARTING:
@@ -384,6 +378,8 @@ class ProcessGroup:
                     for p in self.processes:
                         if p.status == Status.STARTING:
                             started = False
+                            if self._status != Status.STARTING:
+                                self._set_status(Status.STARTING)
                             break
 
                     if started:
@@ -391,15 +387,9 @@ class ProcessGroup:
 
         process = Process(name, command, env)
         process.set_status_listener(set_process_status)
-        self.processes[process] = Status.NOTSTARTED
+        self.processes[process] = process.status
 
     def remove_process(self, process):
-        if self._status != Status.NOTSTARTED:
-            raise InvalidState(
-                "ERROR: ProcessGroup <%s> is in <%s>."
-                " A process can be removed only when the ProcessGroup is "
-                "in <%s> state" % (self.name, self._status, Status.NOTSTARTED.name)
-                )
         try:
             del self.processes[process]
         except:
@@ -423,7 +413,7 @@ class ProcessGroup:
         while True:
             self._set_status(Status.STARTING)
             tasks = [asyncio.async(p.start()) for p in self.processes.keys()]
-            yield from asyncio.wait(tasks)
+            done, pending = yield from asyncio.wait(tasks)
             if self._status != Status.RESTARTING:
                 break
         self._set_status(Status.STOPPED)
