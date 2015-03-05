@@ -29,6 +29,7 @@ class Webapp:
     """This class holds all the values corresponding to a web application"""
 
     def __init__(self, app_location, folder_name):
+        self.id = ""
         self.location = app_location + "/" + folder_name
         self.folder_name = folder_name
         self.name = None
@@ -112,6 +113,7 @@ class Webapp:
         try:
             self._init_handlers(config)
         except:
+            print("SEVERE: ", traceback.format_exc())
             return False
 
         try:
@@ -180,6 +182,8 @@ class Webapp:
         except AttributeError:
             self.url_prefix = "/" + self.folder_name
 
+        self.id = self.url_prefix[1:].replace("/","_")
+
         print("INFO: URL prefix <%s>" % self.url_prefix)
 
         try:
@@ -206,6 +210,7 @@ class Webapp:
             raise Exception("Error initializing handlers")
 
         count = 0
+        self.handlers.insert(0, "BlackPearl.core.handlers")
         for handler in self.handlers:
             try:
                 print("INFO: Initializing handler <%s>" % handler)
@@ -297,12 +302,17 @@ class Webapp:
                         if self._check_url(url, name, member):
                             self.webmodules[url] = webmodule
 
-
 class NotEnabledError(Exception):
     pass
 
 
-def initialize(location):
+def get_webapp_folders(location):
+    if not os.access(location, os.F_OK):
+        print("WARNING: Webapps folder<%s> not found. Ignoring.. " % location)
+    return [name for name in os.listdir(location) if os.path.isdir(location + os.path.sep + name)]
+
+
+def analyze(location, webapp_folder):
     """Initializes the web applications"""
     if not os.access(location, os.F_OK):
         print("WARNING: Webapps folder<%s> not found. Ignoring.. " % location)
@@ -311,23 +321,17 @@ def initialize(location):
     print("INFO: Adding <%s> to python path." % location)
     sys.path.append(location)
 
-    webapps_folder = [name for name in os.listdir(location)
-                      if os.path.isdir(location + os.path.sep + name)]
-    print("INFO: List of webapps folder present in the given path <%s>." + str(webapps_folder))
-    webapps = []
-    for webapp_folder in webapps_folder:
-        try:
-            webapp = Webapp(location, webapp_folder)
-            if webapp.initialize():
-                webapps.append(webapp)
-            else:
-                print("SEVERE: Ignoring the webapp")
-        except NotEnabledError:
-            print("INFO: Ignoring <%s> as is it disabled in configuration file")
-        except:
-            traceback.print_exc()
-            print("Error initializing : %s" % webapp_folder)
+    print("INFO: Adding <%s/%s/lib> to python path." % (location, webapp_folder))
+    sys.path.append(location + webapp_folder + "/lib")
 
-    print("INFO: Webapps deployed at <%s> initialized" % location)
-    print("INFO: List of initialized webapps : %s" % webapps)
-    return webapps
+    try:
+        webapp = Webapp(location, webapp_folder)
+        if webapp.initialize():
+            return webapp
+        else:
+            print("SEVERE: Ignoring the webapp")
+    except NotEnabledError:
+        print("INFO: Ignoring <%s> as is it disabled in configuration file")
+    except:
+        traceback.print_exc()
+        print("Error initializing : %s" % webapp_folder)

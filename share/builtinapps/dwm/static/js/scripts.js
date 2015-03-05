@@ -62,7 +62,7 @@ strings = {
     no_posthandlers: 'No posthandlers deployed'
 };
 
-var _applications = null;
+var _applications = [];
 var _current_module = null;
 var _current_app_id = 0;
 
@@ -83,13 +83,21 @@ function initialize_applications() {
     var ret = {};
     $.getJSON("applications", function (data){
         var status = data.status;
-
         if(status == 0) {
             _applications = data.data;
-
-            if (ret.success) {
-                ret.success();
-            }
+            $.getJSON(_applications[0].url_prefix + "/__application__", function (data){
+                var status = data.status;
+                if(status == 0) {
+                    _applications[0] = data.data;
+                    if (ret.success) {
+                        ret.success();
+                    } 
+                }else {
+                    if (ret.failure) {
+                        ret.failure();
+                    }
+                }
+            });
         } else {
             if (ret.failure) {
                 ret.failure();
@@ -105,7 +113,7 @@ function load_topmenu() {
     for(var i = 0; i < _applications.length; i++) {
         apps.push({
             "id" : i,
-            "name" : _applications[i].name
+            "name" : typeof _applications[i].name !== 'undefined' ? _applications[i].name : _applications[i][0]
         })
     }
     apps[0].active = true;
@@ -156,7 +164,7 @@ function load_modules(id) {
 
 function load_signature(url) {
     //$("#module-details-selected").html(url);
-    $.getJSON("signature?url=" + url , function (data){
+    $.getJSON(_applications[_current_app_id].url_prefix + "/__signature__?url=" + url , function (data){
             if (data.data.desc) {
                 $("#description-module").html(data.data.desc)
             } else {
@@ -187,9 +195,24 @@ function load_testsets(testsets) {
 function openapp(id, object) {
     $(".application-list-item").removeClass("active");
     $(object).parent().addClass("active");
-    load_description(id);
-    load_modules(id);
-    _current_app_id = id;
+
+    if (Object.keys(_applications[id]).length == 2) {
+        $.getJSON(_applications[id].url_prefix + "/__application__", function (data){
+            var status = data.status;
+            if(status == 0) {
+                _current_app_id = id;
+                _applications[id] = data.data;
+                load_description(id);
+                load_modules(id);
+            }else {
+                error("Error Opening Webapp","We are facing challenge in access the server. Check your network connectivity");
+            }
+        });
+    } else {
+        _current_app_id = id;
+        load_description(id);
+        load_modules(id);
+    }
 }
 
 function openmodule(url, object) {
@@ -312,9 +335,9 @@ function execute_testset(testset) {
     '</div> <div class="spinner-container container3"> <div class="circle1"></div> <div class="circle2"></div> ' +
     '<div class="circle3"></div> <div class="circle4"></div> </div></div></pre>');
     if (testset) {
-        url = "testing/run?url=" + _current_module +"&name=" + testset;
+        url = _applications[_current_app_id].url_prefix + "/__test_run__?url=" + _current_module +"&name=" + testset;
     } else {
-        url = "testing/run_all?url=" + _current_module;
+        url = _applications[_current_app_id].url_prefix + "/__test_run_all__?url=" + _current_module;
     }
 
     $.get(url, function(data) {

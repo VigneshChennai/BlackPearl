@@ -177,6 +177,7 @@ def _invoke_webmodule(opener, url, testcase_input):
     # invoking the webmodule.
     # TODO: https protocol need to be supported.
     # TODO: Support file and post form submit method.
+
     response = opener.open("http://" + listen + url,
                            urllib.parse.urlencode(t_inputs).encode('UTF-8'))
     return response.read()

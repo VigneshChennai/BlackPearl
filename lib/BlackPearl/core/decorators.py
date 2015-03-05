@@ -94,6 +94,7 @@ def weblocation(parameter):
                     "url": url,
                     "func": invoker,
                     "handler": method,
+                    "arguments": utils.get_signature_details(method),
                     "desc": target.__doc__
                 })
             target.__webmodules__ = webmodules
@@ -105,6 +106,7 @@ def weblocation(parameter):
                 "url": parameter,
                 "func": FunctionInvoker(target),
                 "handler": target,
+                "arguments": utils.get_signature_details(target),
                 "desc": target.__doc__
             }
         else:

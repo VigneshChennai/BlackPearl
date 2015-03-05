@@ -87,8 +87,10 @@ def start_server(daemon, config):
     os.mkdir(os.path.join(os.path.join(config.run, 'uwsgi'), 'pickle'))
     if not os.access(config.logs, os.F_OK):
         os.makedirs(config.logs)
+    if not os.access(os.path.join(config.logs, "uwsgi"), os.F_OK):
+        os.makedirs(os.path.join(config.logs, "uwsgi"))
 
-    open(os.path.join(os.path.join(config.run, 'uwsgi'), "worker_reload.file"), "w").close()
+    # open(os.path.join(os.path.join(config.run, 'uwsgi'), "worker_reload.file"), "w").close()
     print("\nStarting BlackPearl server ...")
     print("Generating log files at %s" % config.logs)
     appserver.start(config, daemon)
