@@ -416,8 +416,8 @@ class ProcessGroup:
         if self._status == Status.NOTSTARTED:
             del self.processes[name]
         else:
-            yield from process.stop()
             del self.processes[name]
+            yield from process.stop()
 
     @asyncio.coroutine
     def start(self):

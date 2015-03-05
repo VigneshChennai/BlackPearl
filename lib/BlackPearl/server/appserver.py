@@ -43,6 +43,13 @@ class WebAppMinimal:
         self.pickle_file = pickle_file
         self.url_prefix = webapp.url_prefix
 
+    def __repr__(self):
+        return repr({
+            "webapp": self.name,
+            "url_prefix": self.url_prefix,
+            "location": self.location
+        })
+
 
 def analyse_and_pickle_webapps(pickle_folder, *app_dirs):
     def analyser(location, folder, queue):
@@ -109,7 +116,7 @@ class Uwsgi(ProcessGroup):
         super().__init__(name="uWsgi Service")
         self.run_loc = run_loc
         self.uwsgi_loc = uwsgi_loc
-        self.webapps_list = webapps_list
+        self.webapps_list = []
         self.uwsgi_file = uwsgi_file
         self.logs_dir = logs_dir
         self.security_key = security_key
@@ -118,17 +125,45 @@ class Uwsgi(ProcessGroup):
         self.pypath = pypath
         self.uwsgi_options = uwsgi_options
 
-        for webapp in webapps_list:
+        self._add_apps(webapps_list)
+        self.webapps_list = webapps_list
+
+    @asyncio.coroutine
+    def add_apps(self, webapps_list):
+        deployed_apps_id = [w.id for w in self.webapps_list]
+        new_apps_id = [w.id for w in webapps_list]
+        print("DEBUG: Already deployed apps :", deployed_apps_id)
+        print("DEBUG: Apps recently analyzed :", new_apps_id)
+        apps_to_start = [webapp for webapp in webapps_list if webapp.id not in deployed_apps_id]
+        apps_to_stop = [webapp for webapp in self.webapps_list if webapp.id not in new_apps_id]
+        for webapp in apps_to_stop:
+            print("DEBUG: Stopping uWsgi Service for <", webapp.name, "(", webapp.url_prefix,
+                  ") > webapp as it is removed or it has error after recent code change")
+            yield from self.remove_process("'%s' uWsgi Service" % webapp.id)
+
+        self.webapps_list = webapps_list
+        if len(apps_to_start) > 0:
+            self.generate_conf_file()
+            self._add_apps(apps_to_start)
+
+
+
+
+    def _add_apps(self, apps_to_start):
+        for webapp in apps_to_start:
+            print("DEBUG: Starting uWsgi Service for <", webapp.name, "(", webapp.url_prefix, ") > webapp")
             command = [self.uwsgi_loc, '--ini', "%s/uwsgi/%s.conf" % (self.run_loc, webapp.id)]
-            self.add_process(name="'%s' uWsgi Service" % webapp.name, command=command,
-                             env={
-                                 "BLACKPEARL_DEPLOYED_APPS_PICKLE": "%s/uwsgi/pickle/deployed_apps.pickle" % run_loc,
-                                 "BLACKPEARL_PICKLE_FILE": webapp.pickle_file,
-                                 "BLACKPEARL_ENCRYPT_KEY": self.security_key,
-                                 "BLACKPEARL_ENCRYPT_BLOCK_SIZE": str(self.security_block_size),
-                                 "BLACKPEARL_LISTEN": str(self.nginx_bind),
-                                 "PYTHONPATH": ":".join(self.pypath)
-                             })
+            self.add_process(
+                name="'%s' uWsgi Service" %webapp.id, command=command,
+                env={
+                    "BLACKPEARL_DEPLOYED_APPS_PICKLE": "%s/uwsgi/pickle/deployed_apps.pickle" % self.run_loc,
+                    "BLACKPEARL_PICKLE_FILE": webapp.pickle_file,
+                    "BLACKPEARL_ENCRYPT_KEY": self.security_key,
+                    "BLACKPEARL_ENCRYPT_BLOCK_SIZE": str(self.security_block_size),
+                    "BLACKPEARL_LISTEN": str(self.nginx_bind),
+                    "PYTHONPATH": ":".join(self.pypath)
+                }
+            )
 
     def generate_conf_file(self):
         try:
@@ -473,8 +508,11 @@ class AppServer():
 
                     self.nginx.generate_conf_file(webapps_list)
                     for m_webapp in modified_webapps:
+                        print("INFO: Reloading webapp <", m_webapp.name, ">")
                         with open('%s/uwsgi/%s.reload' % (self.uwsgi.run_loc, m_webapp.id), "w") as f:
                             f.write("reload workers")
+
+                    yield from self.uwsgi.add_apps(webapps_list)
                     self.nginx.reload_conf()
                     print("INFO: Code updated.")
             else:
@@ -517,7 +555,6 @@ class AppServer():
                 elif self.status == Status.STARTED:
                     self.status = Status.TERMINATED
                     print("ERROR: Services terminated unexpectedly")
-            #  TODO: For other status is starting ??????
         elif status == process.Status.RESTARTING:
             print("INFO: Service <%s> getting restarted." % service)
 
