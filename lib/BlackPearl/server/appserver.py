@@ -429,7 +429,7 @@ class AppServer():
                 for task in done:
                     if task == self.async_task_handlers[i]:
                         to_del.append(i)
-
+            to_del.sort(reverse=True)
             for i in to_del:
                 del self.async_task_handlers[i]
 

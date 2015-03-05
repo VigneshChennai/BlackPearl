@@ -333,12 +333,12 @@ class ServerProcess(Process):
 
 class ProcessGroup:
 
-    def __init__(self, name, stop_all_on_one_crashed=True):
+    def __init__(self, name):
         self.name = name
         self._status = Status.NOTSTARTED
-        self.status_listener_cb = None
         self.processes = {}
-        self.stop_all_on_one_crashed = stop_all_on_one_crashed
+        self.async_task_list = []
+        self.status_listener_cb = None
 
     @property
     def status(self):
@@ -355,6 +355,11 @@ class ProcessGroup:
                 error = traceback.format_exc()
                 print("ERROR : %s" % error)
 
+    def _async_task(self, task):
+        task_handler = asyncio.async(task)
+        self.async_task_list.append(task_handler)
+        return task_handler
+
     def set_status_listener(self, callback):
         args = len(inspect.signature(callback).parameters)
         if args != 1:
@@ -364,37 +369,55 @@ class ProcessGroup:
         self.status_listener_cb = callback
 
     def add_process(self, name, command, env=None):
+        if name in self.processes:
+            raise ValueError("The process with name <%s> is already added to the ProcessGroup<%s>" % (name, self.name))
+
         def set_process_status(status):
-            self.processes[process] = status
-            if status in (Status.STOPPED, Status.TERMINATED, Status.STARTFAILED) and self._status != Status.STOPPING:
-                if process in self.processes:
-                    if self.stop_all_on_one_crashed:
-                        print("WARNING: Stopping all the process in the ProcessGroup<%s>" % self.name)
-                        asyncio.async(self.stop())
-
+            if name in self.processes:
+                self.processes[name]["status"] = status
             else:
-                if self._status == Status.STARTING:
-                    started = True
-                    for p in self.processes:
-                        if p.status == Status.STARTING:
-                            started = False
-                            if self._status != Status.STARTING:
-                                self._set_status(Status.STARTING)
-                            break
+                return
 
-                    if started:
-                        self._set_status(Status.STARTED)
+            if status in (Status.STOPPED, Status.TERMINATED, Status.STARTFAILED) and self._status != Status.STOPPING:
+                print("WARNING: Stopping all the process in the ProcessGroup<%s>" % self.name)
+                self._async_task(self.stop())
+
+            elif self._status == Status.STARTING:
+                started = True
+                for p in self.processes.values():
+                    if p["status"] == Status.STARTING:
+                        started = False
+                        if self._status != Status.STARTING:
+                            self._set_status(Status.STARTING)
+                        break
+
+                if started:
+                    self._set_status(Status.STARTED)
+            # elif status == Status.STOPPED:
 
         process = Process(name, command, env)
         process.set_status_listener(set_process_status)
-        self.processes[process] = process.status
+        self.processes[name] = {
+            "process": process,
+            "status": process.status
+        }
 
-    def remove_process(self, process):
+        if self._status != Status.NOTSTARTED:
+            self._async_task(process.start())
+
+    @asyncio.coroutine
+    def remove_process(self, name):
         try:
-            del self.processes[process]
-        except:
+            process = self.processes[name]["process"]
+        except KeyError:
             raise ValueError("The process<%s> is not added to the "
-                             "ProcessGroup<%s>" %(process.name, self.name)) from None
+                             "ProcessGroup<%s>" % (name, self.name)) from None
+
+        if self._status == Status.NOTSTARTED:
+            del self.processes[name]
+        else:
+            yield from process.stop()
+            del self.processes[name]
 
     @asyncio.coroutine
     def start(self):
@@ -410,18 +433,35 @@ class ProcessGroup:
                     )
                 )
             )
+
+        self._set_status(Status.STARTING)
+        for p in self.processes.values():
+            self._async_task(p["process"].start())
+
         while True:
-            self._set_status(Status.STARTING)
-            tasks = [asyncio.async(p.start()) for p in self.processes.keys()]
-            done, pending = yield from asyncio.wait(tasks)
+            while len(self.async_task_list) > 0:
+                done, pending = yield from asyncio.wait(self.async_task_list, return_when=asyncio.FIRST_COMPLETED)
+                to_del = []
+                for i in range(0, len(self.async_task_list)):
+                    for task in done:
+                        if task == self.async_task_list[i]:
+                            to_del.append(i)
+                to_del.sort(reverse=True)
+                for i in to_del:
+                    del self.async_task_list[i]
+
             if self._status != Status.RESTARTING:
                 break
+            else:
+                self._set_status(Status.STARTING)
+                for p in self.processes.values():
+                    self._async_task(p["process"].start())
         self._set_status(Status.STOPPED)
 
     @asyncio.coroutine
     def stop(self):
         self._set_status(Status.STOPPING)
-        tasks = [asyncio.async(p.stop()) for p in self.processes.keys()]
+        tasks = [self._async_task(p["process"].stop()) for p in self.processes.values()]
 
         def cb(future):
             try:
