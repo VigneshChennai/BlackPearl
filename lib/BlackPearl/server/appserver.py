@@ -29,8 +29,8 @@ import pyinotify
 from enum import Enum
 
 from BlackPearl.server.core import process
-from BlackPearl.server.core.process import Process, ProcessGroup
-from BlackPearl.server.utils import prechecks, fileutils, serialize
+from BlackPearl.server.core.process import Process, ProcessGroup, AsyncTaskManager, ProcessStatusManager
+from BlackPearl.server.utils import prechecks, fileutils
 from BlackPearl.server.core.logger import Logger
 from BlackPearl.core import webapps as webapps
 
@@ -145,9 +145,6 @@ class Uwsgi(ProcessGroup):
         if len(apps_to_start) > 0:
             self.generate_conf_file()
             self._add_apps(apps_to_start)
-
-
-
 
     def _add_apps(self, apps_to_start):
         for webapp in apps_to_start:
@@ -315,18 +312,18 @@ class Nginx(Process):
 Status = Enum("Status", "NOTSTARTED, STARTING, STARTFAILED, STARTED, STOPPING, RESTARTING, STOPPED, TERMINATED")
 
 
-class AppServer():
+class AppServer(AsyncTaskManager):
 
     # Instance Variables : config, status, reloading_code, reloading_conf,
-    #                      async_task_handlers, webapp_locations, ev_loop, uwsgi, nginx
+    #                      webapp_locations, ev_loop, uwsgi, nginx
     def __init__(self, config):
+        AsyncTaskManager.__init__(self)
         self.config = config
 
         self.status = Status.NOTSTARTED
         self.reloading_code = False
         self.reloading_conf = False
         self.modified_files = []
-        self.async_task_handlers = []
 
         webapp_locations = [config.webapps]
         if config.adminapps_enabled:
@@ -392,11 +389,6 @@ class AppServer():
             sig = getattr(signal, signal_name)
             self.ev_loop.add_signal_handler(sig, functools.partial(signal_handler, sig))
 
-    def _async_task(self, task):
-        task_handler = asyncio.async(task, loop=self.ev_loop)
-        self.async_task_handlers.append(task_handler)
-        return task_handler
-
     def start(self, ev_loop=None):
         # Getting the event loop
         if ev_loop:
@@ -419,8 +411,8 @@ class AppServer():
                 print("ERROR: %s" % error)
                 print("SEVERE: %s failed to start" % service)
 
-        self._async_task(self.uwsgi.start()).add_done_callback(functools.partial(start_cb, "uwsgi"))
-        self._async_task(self.nginx.start()).add_done_callback(functools.partial(start_cb, "nginx"))
+        self.new_async_task(self.uwsgi.start()).add_done_callback(functools.partial(start_cb, "uwsgi"))
+        self.new_async_task(self.nginx.start()).add_done_callback(functools.partial(start_cb, "nginx"))
 
         if not ev_loop:
             self.server_forever()
@@ -437,8 +429,8 @@ class AppServer():
                 print("ERROR: %s" % error)
                 print("SEVERE: %s failed to stop" % service)
 
-        self._async_task(self.uwsgi.stop()).add_done_callback(functools.partial(stop_cb, "uwsgi"))
-        self._async_task(self.nginx.stop()).add_done_callback(functools.partial(stop_cb, "nginx"))
+        self.new_async_task(self.uwsgi.stop()).add_done_callback(functools.partial(stop_cb, "uwsgi"))
+        self.new_async_task(self.nginx.stop()).add_done_callback(functools.partial(stop_cb, "nginx"))
 
     def restart(self):
         self.status = Status.RESTARTING
@@ -452,22 +444,12 @@ class AppServer():
                 print("ERROR: %s" % error)
                 print("SEVERE: %s failed to restart" % service)
 
-        self._async_task(self.uwsgi.restart()).add_done_callback(functools.partial(restart_cb, "uwsgi"))
-        self._async_task(self.nginx.restart()).add_done_callback(functools.partial(restart_cb, "nginx"))
+        self.new_async_task(self.uwsgi.restart()).add_done_callback(functools.partial(restart_cb, "uwsgi"))
+        self.new_async_task(self.nginx.restart()).add_done_callback(functools.partial(restart_cb, "nginx"))
 
     @asyncio.coroutine
     def server_forever_async(self):
-        while len(self.async_task_handlers) > 0:
-            done, pending = yield from asyncio.wait(self.async_task_handlers, return_when=asyncio.FIRST_COMPLETED)
-            to_del = []
-            for i in range(0, len(self.async_task_handlers)):
-                for task in done:
-                    if task == self.async_task_handlers[i]:
-                        to_del.append(i)
-            to_del.sort(reverse=True)
-            for i in to_del:
-                del self.async_task_handlers[i]
-
+        self.wait_for_async_task_completion()
         print("INFO: BlackPearl service was shutdown")
 
     def server_forever(self):
@@ -538,7 +520,7 @@ class AppServer():
                 if self.status != Status.STOPPING:
                     print("SEVERE: %s service stopped unexpectedly" % service)
                     print("SEVERE: So, stopping %s service as well" % other_service)
-                    self._async_task(other_service_obj.stop())
+                    self.new_async_task(other_service_obj.stop())
             else:
                 if self.status == Status.NOTSTARTED:
                     self.status = Status.TERMINATED

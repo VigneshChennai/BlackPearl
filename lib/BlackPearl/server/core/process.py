@@ -20,10 +20,7 @@ import asyncio
 import signal
 import traceback
 import inspect
-import functools
 
-
-from datetime import datetime
 from enum import Enum
 
 _process = []
@@ -38,38 +35,51 @@ def delete_process(process):
         if _process[i] == process:
             del _process[i]
 
+
+class AsyncTaskManager:
+
+    def __init__(self):
+        self.async_task_list = []
+
+    def new_async_task(self, task):
+        task_handler = asyncio.async(task)
+        self.async_task_list.append(task_handler)
+        return task_handler
+
+    def wait_for_async_task_completion(self):
+        while len(self.async_task_list) > 0:
+            done, pending = yield from asyncio.wait(self.async_task_list, return_when=asyncio.FIRST_COMPLETED)
+            to_del = []
+            for i in range(0, len(self.async_task_list)):
+                for task in done:
+                    if task == self.async_task_list[i]:
+                        to_del.append(i)
+            to_del.sort(reverse=True)
+            for i in to_del:
+                del self.async_task_list[i]
+
+
 Status = Enum("Status", "NOTSTARTED, STARTING, STARTFAILED, STARTED, STOPPING, RESTARTING, STOPPED, TERMINATED")
 
 
-class Process:
-
-    def __init__(self, name, command, env=None):
-        self.name = name
-        self.command = command
-        self.process = None
-        self.process_stop_event = asyncio.Event()
-        self._status = Status.NOTSTARTED
-        if env:
-            self.env = env
-        else:
-            self.env = {}
-
-        self.status_listener_cb = None
+class ProcessStatusManager:
+    def __init__(self, process_name, init_status=Status.NOTSTARTED):
+        self._process_name = process_name
+        self.__status__ = init_status
+        self._status_listener_cb = None
 
     @property
     def status(self):
-        return self._status
+        return self.__status__
 
-    def _set_status(self, status):
-        print("DEBUG: Status of process <%s> is <%s>" % (self.name, status))
-        self._status = status
-        if self.status_listener_cb:
+    def __set_status__(self, status):
+        print("DEBUG: Status of process <%s> is <%s>" % (self._process_name, status))
+        self.__status__ = status
+        if self._status_listener_cb:
             try:
-                print("DEBUG: Calling status listener callback for process <%s>." % self.name)
-                self.status_listener_cb(status)
-                print("DEBUG: Calling status listener callback for process <%s> successful" % self.name)
+                self._status_listener_cb(status)
             except:
-                print("ERROR : Error invoking status listener callback of process <%s>" % self.name)
+                print("ERROR : Error invoking status listener callback of process <%s>" % self._process_name)
                 error = traceback.format_exc()
                 print("ERROR : %s" % error)
 
@@ -80,18 +90,30 @@ class Process:
             error = "The callback function should have 1 argument but passed function has %s" % args
             print("INFO: %s" % error)
             raise ValueError(error)
-        self.status_listener_cb = callback
+        self._status_listener_cb = callback
+
+
+class Process(ProcessStatusManager):
+
+    def __init__(self, name, command, env=None):
+        ProcessStatusManager.__init__(self, process_name=name)
+        self.name = name
+        self.command = command
+        self.process = None
+        self.process_stop_event = asyncio.Event()
+        self.__set_status__(Status.NOTSTARTED)
+        if env:
+            self.env = env
+        else:
+            self.env = {}
 
     @asyncio.coroutine
     def start(self):
-        if not (self._status == Status.NOTSTARTED or self._status == Status.STOPPED
-                or self._status == Status.TERMINATED or self._status == Status.STARTFAILED):
+        if not (self.__status__ == Status.NOTSTARTED or self.__status__ == Status.STOPPED
+                or self.__status__ == Status.TERMINATED or self.__status__ == Status.STARTFAILED):
             raise InvalidState(
-                "ERROR: Process <%s> is in <%s>."
-                " The process can be started only while it "
-                "in <%s> state" % (
-                    self.name, self._status.name,
-                    "%s, %s, %s or %s" % (
+                "ERROR: Process <%s> is in <%s>. The process can be started only while it in <%s> state" % (
+                    self.name, self.__status__.name, "%s, %s, %s or %s" % (
                         Status.NOTSTARTED.name, Status.STOPPED.name, Status.TERMINATED.name,
                         Status.STARTFAILED.name
                     )
@@ -100,7 +122,7 @@ class Process:
         try:
             add_process(self)
             while True:
-                self._set_status(Status.STARTING)
+                self.__set_status__(Status.STARTING)
                 null_device = open("/dev/null", "r")
 
                 self.process_stop_event.clear()
@@ -110,33 +132,33 @@ class Process:
                     env=self.env
                 )
 
-                self._set_status(Status.STARTED)
+                self.__set_status__(Status.STARTED)
                 s = yield from self.process.wait()
                 if s != 0:
                     print("ERROR: Process <%s> terminated "
                           "with non zero return code <%s>." % (self.name, s))
-                    if self._status != Status.RESTARTING:
-                        self._set_status(Status.TERMINATED)
+                    if self.__status__ != Status.RESTARTING:
+                        self.__set_status__(Status.TERMINATED)
                         break
                 else:
                     print("INFO: Process <%s> stopped." % (
                         self.name))
-                    if self._status != Status.RESTARTING:
-                        self._set_status(Status.STOPPED)
+                    if self.__status__ != Status.RESTARTING:
+                        self.__set_status__(Status.STOPPED)
                         break
 
         except Exception as e:
             error = traceback.format_exc()
             print("ERROR: %s" % e)
             print("ERROR: %s" % error)
-            self._set_status(Status.STARTFAILED)
+            self.__set_status__(Status.STARTFAILED)
         finally:
             self.process_stop_event.set()
             delete_process(self)
 
     @asyncio.coroutine
     def restart(self):
-        self._set_status(Status.RESTARTING)
+        self.__set_status__(Status.RESTARTING)
         try:
             yield from self.stop()
             # Process will be restarting
@@ -147,23 +169,20 @@ class Process:
             return
 
     def is_running(self):
-        if self._status == Status.STOPPING:
+        if self.__status__ == Status.STOPPING:
             return True
-        if self._status == Status.RESTARTING:
+        if self.__status__ == Status.RESTARTING:
             raise NotRestartedYet("ERROR: %s is restarting" % self.name)
-        if self._status == Status.NOTSTARTED:
+        if self.__status__ == Status.NOTSTARTED:
             raise NotStartedYet("ERROR: %s not started yet" % self.name)
         return self._is_running()
 
     def _is_running(self):
-        if self.process and self.process.pid >= 0:
-            try:
-                self.process.send_signal(0)
-                return True
-            except:
-                return False
-        else:
+        if (self.__status__ == Status.NOTSTARTED or self.__status__ == Status.STOPPED
+                or self.__status__ == Status.TERMINATED or self.__status__ == Status.STARTFAILED):
             return False
+        else:
+            return True
 
     @asyncio.coroutine
     def _is_stopped(self, timeout):
@@ -174,33 +193,30 @@ class Process:
 
     @asyncio.coroutine
     def stop(self, timeout=15):
-        if self._status == Status.STARTED or self._status == Status.RESTARTING:
-            if self._status != Status.RESTARTING:
-                self._set_status(Status.STOPPING)
+        if self.__status__ == Status.STARTED or self.__status__ == Status.RESTARTING:
+            if self.__status__ != Status.RESTARTING:
+                self.__set_status__(Status.STOPPING)
             if not self._is_running():
                 print("ERROR: Process <%s> is already stopped."
                       " Ignoring stop request" % self.name)
                 return False
             self.process.send_signal(signal.SIGINT)
-            yield from self._is_stopped(timeout)
-            if self._is_running():
-                print("ERROR: Process <%s> not stopped with "
-                      "SIGINT signal, killing the process" % self.name)
+            stopped = yield from self._is_stopped(timeout)
+            if stopped:
+                print("ERROR: Process <%s> not stopped with SIGINT signal, killing the process" % self.name)
                 self.kill()
             return True
         else:
             raise InvalidState(
-                "ERROR: Process <%s> is in <%s>."
-                " The process can be stopped only while it "
-                "in <%s or %s> state" % (
-                    self.name, self._status, Status.STARTED.name, Status.RESTARTING.name
+                "ERROR: Process <%s> is in <%s>. The process can be stopped only while it in <%s or %s> state" % (
+                    self.name, self.__status__, Status.STARTED.name, Status.RESTARTING.name
                 )
             )
 
     @asyncio.coroutine
     def terminate(self):
-        if self._status == Status.STARTED:
-            self._set_status(Status.STOPPING)
+        if self.__status__ == Status.STARTED:
+            self.__set_status__(Status.STOPPING)
             if not self._is_running():
                 print("ERROR: Process <%s> is already stopped."
                       " Ignoring stop request" % self.name)
@@ -215,7 +231,7 @@ class Process:
         else:
             raise InvalidState("ERROR: Process <%s> is in <%s>."
                                " The process can be terminated only while it "
-                               "in <%s> state" % (self.name, self._status, Status.STARTED))
+                               "in <%s> state" % (self.name, self.__status__, Status.STARTED))
 
     def kill(self):
         if not self._is_running():
@@ -234,139 +250,15 @@ class Process:
         return True
 
 
-class ServerProcess(Process):
-
-    def __init__(self, name, command, env=None, restart_on_crash=True, startup_crash_limit=3, startup_secs=30):
-        Process.__init__(self, name, command, env)
-        self.start_time = None
-        self.last_crashed = None
-        self.crash_count = 0
-        self.successive_startup_crash_count = 0
-        self.crash_history = []
-
-        self.restart_on_crash = restart_on_crash
-        self.startup_secs = startup_secs
-        self.startup_crash_limit = startup_crash_limit
-
-        self._server_status = Status.NOTSTARTED
-
-    @property
-    def status(self):
-        return self._server_status
-
-    def _set_status(self, status):
-        self._status = status
-        if status == Status.STARTED:
-            self._set_server_status(Status.STARTED)
-
-    def _set_server_status(self, status):
-        self._server_status = status
-        if self.status_listener_cb:
-            try:
-                self.status_listener_cb(status)
-            except:
-                print("ERROR : Error invoking status listener callback of process <%s>" % self.name)
-                error = traceback.format_exc()
-                print("ERROR : %s" % error)
-
-    def set_status_listener(self, callback):
-        args = len(inspect.signature(callback).parameters)
-        if args != 1:
-            error = "The callback function should have 1 argument but passed function has %s" % args
-            print("INFO: %s" % error)
-            raise ValueError(error)
-        self.status_listener_cb = callback
-
-    @asyncio.coroutine
-    def start(self):
-        while True:
-            self._set_server_status(Status.STARTING)
-            self.start_time = datetime.now()
-            yield from Process.start(self)
-
-            if self._server_status == Status.STARTING:
-                self._set_server_status(Status.STARTFAILED)
-            elif self._server_status == Status.STARTED:
-                print("WARNING: The process <%s> stopped/crashed unexpectedly" % self.name)
-                self.last_crashed = datetime.now()
-                self.crash_count += 1
-                self.crash_history.append(self.last_crashed)
-
-                run_duration = self.last_crashed - self.start_time
-                if run_duration.total_seconds() < self.startup_secs:
-                    self.successive_startup_crash_count += 1
-                else:
-                    self.successive_startup_crash_count = 0
-
-                if not self.restart_on_crash:
-                    break
-
-                if self.startup_crash_limit > self.successive_startup_crash_count:
-                    print("INFO: The process is configured to restart on crash.")
-                    print("INFO: Restarting the process <%s>" % self.name)
-                else:
-                    print("INFO: Process <%s> failed to startup after <%s> attempts" % (
-                        self.name, self.startup_crash_limit))
-                    self._set_server_status(Status.STARTFAILED)
-                    break
-            else:
-                if self._status == Status.STOPPED:
-                    self._set_server_status(Status.STOPPED)
-                else:  # if Status.TERMINATED
-                    self._set_server_status(Status.TERMINATED)
-
-    @asyncio.coroutine
-    def stop(self, timeout=15):
-        self._set_server_status(Status.STOPPING)
-        yield from Process.stop(self)
-
-    @asyncio.coroutine
-    def terminate(self):
-        self._set_server_status(Status.STOPPING)
-        yield from Process.terminate(self)
-
-    @asyncio.coroutine
-    def restart(self):
-        self._set_server_status(Status.RESTARTING)
-        yield from Process.restart(self)
-
-
-class ProcessGroup:
+class ProcessGroup(AsyncTaskManager, ProcessStatusManager):
 
     def __init__(self, name):
+        AsyncTaskManager.__init__(self)
+        ProcessStatusManager.__init__(self, process_name=name)
         self.name = name
-        self._status = Status.NOTSTARTED
+        self.__set_status__(Status.NOTSTARTED)
         self.processes = {}
-        self.async_task_list = []
         self.status_listener_cb = None
-
-    @property
-    def status(self):
-        return self._status
-
-    def _set_status(self, status):
-        self._status = status
-
-        if self.status_listener_cb:
-            try:
-                self.status_listener_cb(status)
-            except:
-                print("ERROR : Error invoking status listener callback of process <%s>" % self.name)
-                error = traceback.format_exc()
-                print("ERROR : %s" % error)
-
-    def _async_task(self, task):
-        task_handler = asyncio.async(task)
-        self.async_task_list.append(task_handler)
-        return task_handler
-
-    def set_status_listener(self, callback):
-        args = len(inspect.signature(callback).parameters)
-        if args != 1:
-            error = "The callback function should have 1 argument but passed function has %s" % args
-            print("INFO: %s" % error)
-            raise ValueError(error)
-        self.status_listener_cb = callback
 
     def add_process(self, name, command, env=None):
         if name in self.processes:
@@ -378,21 +270,21 @@ class ProcessGroup:
             else:
                 return
 
-            if status in (Status.STOPPED, Status.TERMINATED, Status.STARTFAILED) and self._status != Status.STOPPING:
+            if status in (Status.STOPPED, Status.TERMINATED, Status.STARTFAILED) and self.__status__ != Status.STOPPING:
                 print("WARNING: Stopping all the process in the ProcessGroup<%s>" % self.name)
-                self._async_task(self.stop())
+                self.new_async_task(self.stop())
 
-            elif self._status == Status.STARTING:
+            elif self.__status__ == Status.STARTING:
                 started = True
                 for p in self.processes.values():
                     if p["status"] == Status.STARTING:
                         started = False
-                        if self._status != Status.STARTING:
-                            self._set_status(Status.STARTING)
+                        if self.__status__ != Status.STARTING:
+                            self.__set_status__(Status.STARTING)
                         break
 
                 if started:
-                    self._set_status(Status.STARTED)
+                    self.__set_status__(Status.STARTED)
             # elif status == Status.STOPPED:
 
         process = Process(name, command, env)
@@ -402,8 +294,8 @@ class ProcessGroup:
             "status": process.status
         }
 
-        if self._status != Status.NOTSTARTED:
-            self._async_task(process.start())
+        if self.__status__ != Status.NOTSTARTED:
+            self.new_async_task(process.start())
 
     @asyncio.coroutine
     def remove_process(self, name):
@@ -413,7 +305,7 @@ class ProcessGroup:
             raise ValueError("The process<%s> is not added to the "
                              "ProcessGroup<%s>" % (name, self.name)) from None
 
-        if self._status == Status.NOTSTARTED:
+        if self.__status__ == Status.NOTSTARTED:
             del self.processes[name]
         else:
             del self.processes[name]
@@ -426,7 +318,7 @@ class ProcessGroup:
                 "ERROR: ProcessGroup <%s> is in <%s>."
                 " The ProcessGroup can be started only while it "
                 "in <%s> state" % (
-                    self.name, self._status.name,
+                    self.name, self.__status__.name,
                     "%s, %s, %s or %s" % (
                         Status.NOTSTARTED.name, Status.STOPPED.name, Status.TERMINATED.name,
                         Status.STARTFAILED.name
@@ -434,34 +326,25 @@ class ProcessGroup:
                 )
             )
 
-        self._set_status(Status.STARTING)
+        self.__set_status__(Status.STARTING)
         for p in self.processes.values():
-            self._async_task(p["process"].start())
+            self.new_async_task(p["process"].start())
 
         while True:
-            while len(self.async_task_list) > 0:
-                done, pending = yield from asyncio.wait(self.async_task_list, return_when=asyncio.FIRST_COMPLETED)
-                to_del = []
-                for i in range(0, len(self.async_task_list)):
-                    for task in done:
-                        if task == self.async_task_list[i]:
-                            to_del.append(i)
-                to_del.sort(reverse=True)
-                for i in to_del:
-                    del self.async_task_list[i]
+            self.wait_for_async_task_completion()
 
-            if self._status != Status.RESTARTING:
+            if self.__status__ != Status.RESTARTING:
                 break
             else:
-                self._set_status(Status.STARTING)
+                self.__set_status__(Status.STARTING)
                 for p in self.processes.values():
-                    self._async_task(p["process"].start())
-        self._set_status(Status.STOPPED)
+                    self.new_async_task(p["process"].start())
+        self.__set_status__(Status.STOPPED)
 
     @asyncio.coroutine
     def stop(self):
-        self._set_status(Status.STOPPING)
-        tasks = [self._async_task(p["process"].stop()) for p in self.processes.values()]
+        self.__set_status__(Status.STOPPING)
+        tasks = [self.new_async_task(p["process"].stop()) for p in self.processes.values()]
 
         def cb(future):
             try:
@@ -480,7 +363,7 @@ class ProcessGroup:
 
     @asyncio.coroutine
     def restart(self):
-        self._set_status(Status.RESTARTING)
+        self.__set_status__(Status.RESTARTING)
         try:
             yield from self.stop()
             # Process will be restarting
