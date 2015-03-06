@@ -46,6 +46,7 @@ class AsyncTaskManager:
         self.async_task_list.append(task_handler)
         return task_handler
 
+    @asyncio.coroutine
     def wait_for_async_task_completion(self):
         while len(self.async_task_list) > 0:
             done, pending = yield from asyncio.wait(self.async_task_list, return_when=asyncio.FIRST_COMPLETED)
@@ -84,7 +85,7 @@ class ProcessStatusManager:
                 print("ERROR : %s" % error)
 
     def set_status_listener(self, callback):
-        print("DEBUG: Adding status listener for process <%s>" % self.name)
+        print("DEBUG: Adding status listener for process <%s>" % self._process_name)
         args = len(inspect.signature(callback).parameters)
         if args != 1:
             error = "The callback function should have 1 argument but passed function has %s" % args
@@ -101,7 +102,6 @@ class Process(ProcessStatusManager):
         self.command = command
         self.process = None
         self.process_stop_event = asyncio.Event()
-        self.__set_status__(Status.NOTSTARTED)
         if env:
             self.env = env
         else:
@@ -202,7 +202,7 @@ class Process(ProcessStatusManager):
                 return False
             self.process.send_signal(signal.SIGINT)
             stopped = yield from self._is_stopped(timeout)
-            if stopped:
+            if not stopped:
                 print("ERROR: Process <%s> not stopped with SIGINT signal, killing the process" % self.name)
                 self.kill()
             return True
@@ -256,7 +256,6 @@ class ProcessGroup(AsyncTaskManager, ProcessStatusManager):
         AsyncTaskManager.__init__(self)
         ProcessStatusManager.__init__(self, process_name=name)
         self.name = name
-        self.__set_status__(Status.NOTSTARTED)
         self.processes = {}
         self.status_listener_cb = None
 
@@ -331,8 +330,7 @@ class ProcessGroup(AsyncTaskManager, ProcessStatusManager):
             self.new_async_task(p["process"].start())
 
         while True:
-            self.wait_for_async_task_completion()
-
+            yield from self.wait_for_async_task_completion()
             if self.__status__ != Status.RESTARTING:
                 break
             else:

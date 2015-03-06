@@ -449,7 +449,7 @@ class AppServer(AsyncTaskManager):
 
     @asyncio.coroutine
     def server_forever_async(self):
-        self.wait_for_async_task_completion()
+        yield from self.wait_for_async_task_completion()
         print("INFO: BlackPearl service was shutdown")
 
     def server_forever(self):
