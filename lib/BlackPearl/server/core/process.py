@@ -20,6 +20,7 @@ import asyncio
 import signal
 import traceback
 import inspect
+import functools
 
 from enum import Enum
 
@@ -36,7 +37,7 @@ def delete_process(process):
             del _process[i]
 
 
-class AsyncTaskManager:
+class AsyncTask:
 
     def __init__(self):
         self.async_task_list = []
@@ -63,41 +64,66 @@ class AsyncTaskManager:
 Status = Enum("Status", "NOTSTARTED, STARTING, STARTFAILED, STARTED, STOPPING, RESTARTING, STOPPED, TERMINATED")
 
 
-class ProcessStatusManager:
+class ProcessStatus:
     def __init__(self, process_name, init_status=Status.NOTSTARTED):
         self._process_name = process_name
         self.__status__ = init_status
-        self._status_listener_cb = None
+        self._status_cb_list = []
 
     @property
     def status(self):
         return self.__status__
 
+    @classmethod
+    def _get_module_path(cls, func):
+        """This function returns the module in which the function is defined"""
+        if isinstance(func, functools.partial):
+            func = func.func
+
+        if hasattr(func, "__self__"):
+            return func.__name__ + " defined in class " + repr(func.__self__.__class__)
+
+        mod = inspect.getmodule(func)
+        if mod:
+            for path, module in sys.modules.items():
+                if mod == module:
+                    return func.__name__ + " defined in module <" + path + ">"
+
     def __set_status__(self, status):
         print("DEBUG: Status of process <%s> is <%s>" % (self._process_name, status))
         self.__status__ = status
-        if self._status_listener_cb:
+        if len(self._status_cb_list) > 0:
             try:
-                self._status_listener_cb(status)
+                for cb in self._status_cb_list:
+                    cb(status)
             except:
                 print("ERROR : Error invoking status listener callback of process <%s>" % self._process_name)
                 error = traceback.format_exc()
                 print("ERROR : %s" % error)
 
-    def set_status_listener(self, callback):
-        print("DEBUG: Adding status listener for process <%s>" % self._process_name)
+    def add_status_listener(self, callback):
+        func = ProcessStatus._get_module_path(callback)
+        print("DEBUG: Adding status listener <%s> for process <%s>" % (func, self._process_name))
         args = len(inspect.signature(callback).parameters)
         if args != 1:
-            error = "The callback function should have 1 argument but passed function has %s" % args
+            error = "The callback function <%s> should have 1 argument but passed function has %s" % (func, args)
             print("INFO: %s" % error)
             raise ValueError(error)
-        self._status_listener_cb = callback
+        self._status_cb_list.append(callback)
+
+    def remove_status_listener(self, callback):
+        func = ProcessStatus._get_module_path(callback)
+        print("DEBUG: Removing status listener <%s> for process <%s>" % (func, self._process_name))
+        if callback in self._status_cb_list:
+            del self._status_cb_list[callback]
+        else:
+            raise ValueError("The callback <%s> is not available in status change callback list" % repr(func))
 
 
-class Process(ProcessStatusManager):
+class Process(ProcessStatus):
 
     def __init__(self, name, command, env=None):
-        ProcessStatusManager.__init__(self, process_name=name)
+        ProcessStatus.__init__(self, process_name=name)
         self.name = name
         self.command = command
         self.process = None
@@ -250,11 +276,11 @@ class Process(ProcessStatusManager):
         return True
 
 
-class ProcessGroup(AsyncTaskManager, ProcessStatusManager):
+class ProcessGroup(AsyncTask, ProcessStatus):
 
     def __init__(self, name):
-        AsyncTaskManager.__init__(self)
-        ProcessStatusManager.__init__(self, process_name=name)
+        AsyncTask.__init__(self)
+        ProcessStatus.__init__(self, process_name=name)
         self.name = name
         self.processes = {}
         self.status_listener_cb = None
@@ -287,7 +313,7 @@ class ProcessGroup(AsyncTaskManager, ProcessStatusManager):
             # elif status == Status.STOPPED:
 
         process = Process(name, command, env)
-        process.set_status_listener(set_process_status)
+        process.add_status_listener(set_process_status)
         self.processes[name] = {
             "process": process,
             "status": process.status
