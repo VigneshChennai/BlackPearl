@@ -24,14 +24,21 @@ from time import strftime
 class Logger:
     NONE = 0
     DEBUG = 1
-    INFO = 2
-    ERROR = 3
-    SEVERE = 4
+    FINER = 2
+    FINE = 3
+    INFO = 4
+    WARNING = 5
+    ERROR = 6
+    SEVERE = 7
 
     def __init__(self, mode):
         self.mode = mode
         self.log_file = None
         self._original_print = builtins.print
+        self.disabled_list = []
+
+    def disable_for_module(self, module_path):
+        self.disabled_list.append(module_path)
 
     def initialize(self):
         builtins.print = self._new_print
@@ -42,14 +49,20 @@ class Logger:
 
         if msg.startswith("DEBUG:"):
             return Logger.DEBUG >= self.mode
+        elif msg.startswith("FINER:"):
+            return Logger.FINER >= self.mode
+        elif msg.startswith("FINE:"):
+            return Logger.FINE >= self.mode
         elif msg.startswith("INFO:"):
             return Logger.INFO >= self.mode
+        elif msg.startswith("WARNING:"):
+            return Logger.WARNING >= self.mode
         elif msg.startswith("ERROR:"):
             return Logger.ERROR >= self.mode
         elif msg.startswith("SEVERE:"):
             return Logger.SEVERE >= self.mode
         else:
-            return True
+            raise ValueError("Not a log")
 
     def _new_print(self, *args, **kwargs):
         args1 = [str(arg) for arg in args]
@@ -58,12 +71,23 @@ class Logger:
                 msg = kwargs['sep'].join(args1)
             except:
                 msg = ''.join(args1)
-            if not self._can_print(msg):
-                return
+            try:
+                if not self._can_print(msg):
+                    return
+                just_a_print = False
+            except ValueError:
+                just_a_print = True
 
             frm = inspect.currentframe()
-            line = ['[', strftime("%Y-%m-%d %H:%M:%S"), "Module: %s" % frm.f_back.f_globals['__name__'],
-                    "Line: %s ] " % frm.f_back.f_lineno]
+            from_module = frm.f_back.f_globals['__name__']
+
+            if not just_a_print:
+                for mod in self.disabled_list:
+                    if from_module.startswith(mod):
+                        return
+
+            line = ['[', strftime("%Y-%m-%d %H:%M:%S"), "Module:", from_module,
+                    "Line: %s" % frm.f_back.f_lineno, "] "]
             # kwargs['file'] = self.log_file
             self._original_print(' '.join(line), *args, **kwargs)
         else:
