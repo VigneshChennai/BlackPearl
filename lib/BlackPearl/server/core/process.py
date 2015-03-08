@@ -120,10 +120,11 @@ class ProcessStatus:
             raise ValueError("The callback <%s> is not available in status change callback list" % repr(func))
 
 
-class Process(ProcessStatus):
+class Process(ProcessStatus, AsyncTask):
 
     def __init__(self, name, command, env=None):
         ProcessStatus.__init__(self, process_name=name)
+        AsyncTask.__init__(self)
         self.name = name
         self.command = command
         self.process = None
@@ -145,19 +146,10 @@ class Process(ProcessStatus):
                     )
                 )
             )
-        try:
-            add_process(self)
-            while True:
-                self.__set_status__(Status.STARTING)
-                null_device = open("/dev/null", "r")
 
-                self.process_stop_event.clear()
-                self.process = yield from asyncio.create_subprocess_exec(
-                    *self.command, stdin=null_device,
-                    stdout=sys.stdout, stderr=sys.stderr,
-                    env=self.env
-                )
-
+        @asyncio.coroutine
+        def wait_for_return_code():
+            try:
                 self.__set_status__(Status.STARTED)
                 s = yield from self.process.wait()
                 if s != 0:
@@ -165,29 +157,59 @@ class Process(ProcessStatus):
                           "with non zero return code <%s>." % (self.name, s))
                     if self.__status__ != Status.RESTARTING:
                         self.__set_status__(Status.TERMINATED)
-                        break
                 else:
                     print("INFO: Process <%s> stopped." % (
                         self.name))
                     if self.__status__ != Status.RESTARTING:
                         self.__set_status__(Status.STOPPED)
-                        break
+            except Exception as e:
+                print("ERROR: %s" % e)
+                print("ERROR: %s" % traceback.format_exc())
+                self.__set_status__(Status.TERMINATED)
+            finally:
+                self.process_stop_event.set()
+                delete_process(self)
+
+        try:
+            add_process(self)
+            self.__set_status__(Status.STARTING)
+            null_device = open("/dev/null", "r")
+
+            self.process_stop_event.clear()
+            self.process = yield from asyncio.create_subprocess_exec(
+                *self.command, stdin=null_device,
+                stdout=sys.stdout, stderr=sys.stderr,
+                env=self.env
+            )
+
+            self.new_async_task(wait_for_return_code())
 
         except Exception as e:
             error = traceback.format_exc()
             print("ERROR: %s" % e)
             print("ERROR: %s" % error)
             self.__set_status__(Status.STARTFAILED)
-        finally:
-            self.process_stop_event.set()
-            delete_process(self)
+
+
+    @asyncio.coroutine
+    def wait_for_completion(self):
+        while True:
+            yield from self.wait_for_async_task_completion()
+            if self.__status__ != Status.RESTARTING:
+                break
+            else:
+                while True:
+                    yield from asyncio.sleep(2)
+                    if self.__status__ != Status.RESTARTING:
+                        break
+
 
     @asyncio.coroutine
     def restart(self):
         self.__set_status__(Status.RESTARTING)
         try:
             yield from self.stop()
-            # Process will be restarting
+            yield from self.start()
         except InvalidState as e:
             error = traceback.format_exc()
             print("ERROR: %s" % e)
@@ -259,12 +281,18 @@ class Process(ProcessStatus):
                                " The process can be terminated only while it "
                                "in <%s> state" % (self.name, self.__status__, Status.STARTED))
 
+    @asyncio.coroutine
     def kill(self):
         if not self._is_running():
             print("ERROR: Process <%s> is already stopped."
                   " Ignoring stop request" % self.name)
             return False
         self.process.send_signal(signal.SIGKILL)
+        yield from self._is_stopped()
+        if self._is_running():
+            print("ERROR: Process <%s> not stopped with "
+                  "SIGKILL signal, may be the process is in <defunct> state" % self.name)
+            return False
         return True
 
     def send_signal(self, sig):
@@ -295,9 +323,14 @@ class ProcessGroup(AsyncTask, ProcessStatus):
             else:
                 return
 
-            if status in (Status.STOPPED, Status.TERMINATED, Status.STARTFAILED) and self.__status__ != Status.STOPPING:
-                print("WARNING: Stopping all the process in the ProcessGroup<%s>" % self.name)
-                self.new_async_task(self.stop())
+            if status in (Status.STOPPED, Status.TERMINATED, Status.STARTFAILED):
+                if self.__status__ != Status.STOPPING:
+                    print("WARNING: Stopping all the process in the ProcessGroup<%s>" % self.name)
+                    self.new_async_task(self.stop())
+                else:
+                    if len([p for p in self.processes.values() if p["status"]
+                            not in (Status.STOPPED, Status.TERMINATED, Status.STARTFAILED)]) == 0:
+                        self.__set_status__(Status.STOPPED)
 
             elif self.__status__ == Status.STARTING:
                 started = True
@@ -320,6 +353,7 @@ class ProcessGroup(AsyncTask, ProcessStatus):
         }
 
         if self.__status__ != Status.NOTSTARTED:
+            # TODO: what if the server is currently stopping ?
             self.new_async_task(process.start())
 
     @asyncio.coroutine
@@ -352,18 +386,25 @@ class ProcessGroup(AsyncTask, ProcessStatus):
             )
 
         self.__set_status__(Status.STARTING)
+        tasks = []
         for p in self.processes.values():
-            self.new_async_task(p["process"].start())
+            tasks.append(self.new_async_task(p["process"].start()))
 
+        yield from asyncio.wait(tasks)
+
+    @asyncio.coroutine
+    def wait_for_completion(self):
         while True:
+            for p in self.processes.values():
+                self.new_async_task(p["process"].wait_for_completion())
             yield from self.wait_for_async_task_completion()
             if self.__status__ != Status.RESTARTING:
                 break
             else:
-                self.__set_status__(Status.STARTING)
-                for p in self.processes.values():
-                    self.new_async_task(p["process"].start())
-        self.__set_status__(Status.STOPPED)
+                while True:
+                    yield from asyncio.sleep(2)
+                    if self.__status__ != Status.RESTARTING:
+                        break
 
     @asyncio.coroutine
     def stop(self):
@@ -390,7 +431,7 @@ class ProcessGroup(AsyncTask, ProcessStatus):
         self.__set_status__(Status.RESTARTING)
         try:
             yield from self.stop()
-            # Process will be restarting
+            yield from self.start()
         except InvalidState as e:
             error = traceback.format_exc()
             print("ERROR: %s" % e)

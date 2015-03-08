@@ -36,6 +36,8 @@ from BlackPearl.core import webapps as webapps
 
 
 class WebAppMinimal:
+    """WebAppMinimal will hold a minimal information about the webapp which are required for preparing the run
+    environment for the webapp."""
     def __init__(self, webapp, pickle_file):
         self.id = webapp.id
         self.name = webapp.name
@@ -52,60 +54,84 @@ class WebAppMinimal:
 
 
 def analyse_and_pickle_webapps(pickle_folder, *app_dirs):
+
+    # Analyses the single webapp folder
     def analyser(location, folder, queue):
         try:
             print("INFO: Analysing webapp <%s> ...." % folder)
+            # Analysing the webapp folder and returning the analysis result
             webapp = webapps.analyze(location, folder)
-
             print("INFO: Webapp analysing completed.")
             print("INFO: Webapp details : %s" % webapp)
+
+            # Pickling the webapp information
             f = os.path.join(pickle_folder, webapp.id + ".pickle")
             print("INFO: Writing analysed information to file <%s>." % f)
             with open(f, "wb") as pickle_file:
                 pickle.dump(webapp, pickle_file)
             print("INFO: Write completed")
 
+            # Returning only the minimal information to main process to prevent any webapp module getting imported to
+            # the main process
             queue.put(WebAppMinimal(webapp, f))
         except:
             print("ERROR: Fatal error during analysing webapps.")
             print("ERROR: %s" % traceback.format_exc())
+            # Returning None on failure
             queue.put(None)
 
-    rets = []
+    # Will be used to hold the list of webapp analysis result
+    analyse_result_list = []
     print("INFO: Analysing deployed webapps ....")
+
+    # Looping over the webapp deployment folders
     for app_dir in app_dirs:
         print("INFO: Initializing webapps located at <%s>" % app_dir)
+
+        # Looping over the webapp folders deployed in a deployment folder
         for webapp_folder in webapps.get_webapp_folders(app_dir):
             q = multiprocessing.Queue()
+            # Running the analysing working in a separate process to avoid webapp modules getting imported to main
+            # process
             p = multiprocessing.Process(target=analyser, args=(app_dir, webapp_folder, q))
             p.start()
+
+            # Getting the output of analysis
             ret = q.get()
             if ret:
-                rets.append(ret)
+                analyse_result_list.append(ret)
             p.join()
         print("INFO: Webapps deployed at <%s> initialized" % app_dir)
 
-    print("INFO: List of initialized webapps : %s" % rets)
+    print("INFO: List of initialized webapps : %s" % analyse_result_list)
+
+    # Writing webapp list to file
     da_file = os.path.join(pickle_folder, "deployed_apps.pickle")
     print("INFO: Writing deployed apps information to file <%s>." % da_file)
     data = []
-    for ret in rets:
+    for ret in analyse_result_list:
         data.append({"name" : ret.name, "url_prefix" : ret.url_prefix})
     with open(da_file, "wb") as da_file:
         pickle.dump(data, da_file)
 
-    return rets
+    return analyse_result_list
 
 
 def precheck():
+    """Function used to perform precheck before starting the application"""
     try:
         prechecks.check_all()
         return True
     except:
+        error = traceback.format_exc()
+        print("ERROR: Error during the precheck.")
+        print("ERROR: ", error)
         return False
 
 
 class Uwsgi(ProcessGroup):
+
+    # List of options which can not be overriding from configuration file.
     __immutable_options__ = [
         'socket', 'wsgi-file', 'log-to', 'pidfile', 'touch-workers-reload', 'lazy-apps'
     ]
@@ -347,7 +373,7 @@ class AppServer(AsyncTask, ProcessStatus):
         self.webapp_locations = webapp_locations
 
         # Asyncio the event loop
-        self.ev_loop = None
+        self.ev_loop = asyncio.get_event_loop()
 
         self.uwsgi = Uwsgi(
             config.uwsgi, config.home + "/lib/wsgi.py", webapps_list,
@@ -378,7 +404,7 @@ class AppServer(AsyncTask, ProcessStatus):
             print('Received signal : ', signum)
             if signum in (signal.SIGTERM, signal.SIGINT, signal.SIGABRT):
                 print("INFO: Stopping BlackPearl service")
-                self.stop()
+                self.new_async_task(self.stop())
             elif signum == signal.SIGHUP:
                 print("INFO: Redeploy BlackPearl")
                 self.reload_conf()
@@ -389,12 +415,8 @@ class AppServer(AsyncTask, ProcessStatus):
             sig = getattr(signal, signal_name)
             self.ev_loop.add_signal_handler(sig, functools.partial(signal_handler, sig))
 
-    def start(self, ev_loop=None):
-        # Getting the event loop
-        if ev_loop:
-            self.ev_loop = ev_loop
-        else:
-            self.ev_loop = asyncio.get_event_loop()
+    @asyncio.coroutine
+    def start(self):
 
         # Initializing Code update Monitor
         self._code_update_monitor_init()
@@ -411,12 +433,14 @@ class AppServer(AsyncTask, ProcessStatus):
                 print("ERROR: %s" % error)
                 print("SEVERE: %s failed to start" % service)
 
-        self.new_async_task(self.uwsgi.start()).add_done_callback(functools.partial(start_cb, "uwsgi"))
-        self.new_async_task(self.nginx.start()).add_done_callback(functools.partial(start_cb, "nginx"))
+        uwsgi_task = asyncio.async(self.uwsgi.start())
+        nginx_task = asyncio.async(self.nginx.start())
+        uwsgi_task.add_done_callback(functools.partial(start_cb, "uwsgi"))
+        nginx_task.add_done_callback(functools.partial(start_cb, "nginx"))
 
-        if not ev_loop:
-            self.server_forever()
+        yield from asyncio.wait([uwsgi_task, nginx_task])
 
+    @asyncio.coroutine
     def stop(self):
         self.__set_status__(Status.STOPPING)
 
@@ -429,9 +453,14 @@ class AppServer(AsyncTask, ProcessStatus):
                 print("ERROR: %s" % error)
                 print("SEVERE: %s failed to stop" % service)
 
-        self.new_async_task(self.uwsgi.stop()).add_done_callback(functools.partial(stop_cb, "uwsgi"))
-        self.new_async_task(self.nginx.stop()).add_done_callback(functools.partial(stop_cb, "nginx"))
+        uwsgi_task = asyncio.async(self.uwsgi.stop())
+        nginx_task = asyncio.async(self.nginx.stop())
+        uwsgi_task.add_done_callback(functools.partial(stop_cb, "uwsgi"))
+        nginx_task.add_done_callback(functools.partial(stop_cb, "nginx"))
 
+        yield from asyncio.wait([uwsgi_task, nginx_task])
+
+    @asyncio.coroutine
     def restart(self):
         self.__set_status__(Status.RESTARTING)
 
@@ -444,21 +473,25 @@ class AppServer(AsyncTask, ProcessStatus):
                 print("ERROR: %s" % error)
                 print("SEVERE: %s failed to restart" % service)
 
-        self.new_async_task(self.uwsgi.restart()).add_done_callback(functools.partial(restart_cb, "uwsgi"))
-        self.new_async_task(self.nginx.restart()).add_done_callback(functools.partial(restart_cb, "nginx"))
+        uwsgi_task = asyncio.async(self.uwsgi.restart())
+        nginx_task = asyncio.async(self.nginx.restart())
+        uwsgi_task.add_done_callback(functools.partial(restart_cb, "uwsgi"))
+        nginx_task.add_done_callback(functools.partial(restart_cb, "nginx"))
+
+        yield from asyncio.wait([uwsgi_task, nginx_task])
 
     @asyncio.coroutine
-    def server_forever_async(self):
+    def wait_for_completion(self):
+        self.new_async_task(self.uwsgi.wait_for_completion())
+        self.new_async_task(self.nginx.wait_for_completion())
         yield from self.wait_for_async_task_completion()
         print("INFO: BlackPearl service was shutdown")
-
-    def server_forever(self):
-        self.ev_loop.run_until_complete(self.server_forever_async())
 
     def reload_conf(self):
         self.uwsgi.reload_conf()
         self.nginx.reload_conf()
 
+    @asyncio.coroutine
     def reload_code(self):
 
         if self.reloading_code:
@@ -559,7 +592,7 @@ class AppServer(AsyncTask, ProcessStatus):
             print("INFO: File<%s> modified." % event.pathname)
             self.modified_files.append(event.pathname)
             if not self.reloading_code:
-                asyncio.async(self.reload_code())
+                self.new_async_task(self.reload_code())
 
 
 # From my gist - https://gist.github.com/VigneshChennai/35bb64d41e4a4beb2225
@@ -626,9 +659,18 @@ def start(config, daemon=False):
         with open(config.run + "/BlackPearl.pid", "w") as f:
             f.write(str(os.getpid()))
 
+        ev_loop = asyncio.get_event_loop()
         app_server = AppServer(config)
         # Creates the event loop and will wait till the server stops
-        app_server.start()
+
+        start_task = asyncio.async(app_server.start())
+        ev_loop.run_until_complete(start_task)
+        print("INFO: BlackPearl services started.")
+
+        try:
+            ev_loop.run_until_complete(app_server.wait_for_completion())
+        finally:
+            ev_loop.close()
 
 
 class NoApplicationDeployedError(Exception):
