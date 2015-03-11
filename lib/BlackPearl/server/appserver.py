@@ -664,10 +664,13 @@ def start(config, daemon=False):
         # Creates the event loop and will wait till the server stops
 
         start_task = asyncio.async(app_server.start())
+
+        # Waits till server starts
         ev_loop.run_until_complete(start_task)
         print("INFO: BlackPearl services started.")
 
         try:
+            # Waiting for server to shutdown
             ev_loop.run_until_complete(app_server.wait_for_completion())
         finally:
             ev_loop.close()
