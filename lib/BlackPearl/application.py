@@ -42,7 +42,7 @@ def __application__(environ, start_response):
     # Parsing the input values.
     # The FieldStorage will handle all methods and file upload as well.
     formvalues = cgi.FieldStorage(fp=environ['wsgi.input'], environ=environ)
-    headers = [('Content-Type', "application/json")]
+    headers = [('Content-Type', "text/json")]
     try:
         # Restricting the access method only to GET and POST
         if not (method == 'GET' or method == 'POST'):
