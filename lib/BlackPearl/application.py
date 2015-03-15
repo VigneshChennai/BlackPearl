@@ -102,11 +102,19 @@ def __application__(environ, start_response):
                 "desc": str(e)
             }
             return [json.dumps(rets).encode('UTF-8')]
-        except Exception as e:
+        except exceptions.UnAuthorizedAccess as e:
             status = "200 ok"
             start_response(status, headers)
             rets = {
                 "status": -102,
+                "desc": str(e)
+            }
+            return [json.dumps(rets).encode('UTF-8')]
+        except Exception as e:
+            status = "200 ok"
+            start_response(status, headers)
+            rets = {
+                "status": -103,
                 "desc": "Exception occurred in Preprocessor. Error: <%s>" % str(e)
             }
             return [json.dumps(rets).encode('UTF-8')]
