@@ -302,6 +302,7 @@ class Webapp:
                         if self._check_url(url, name, member):
                             self.webmodules[url] = webmodule
 
+
 class NotEnabledError(Exception):
     pass
 

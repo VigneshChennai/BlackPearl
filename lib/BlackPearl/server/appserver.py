@@ -184,7 +184,7 @@ class Uwsgi(ProcessGroup):
                     "BLACKPEARL_ENCRYPT_KEY": self.security_key,
                     "BLACKPEARL_ENCRYPT_BLOCK_SIZE": str(self.security_block_size),
                     "BLACKPEARL_LISTEN": str(self.nginx_bind),
-                    "PYTHONPATH": ":".join(self.pypath)
+                    "PYTHONPATH": ":".join(self.pypath + [webapp.location + "/lib"])
                 }
             )
 
@@ -389,7 +389,7 @@ class AppServer(AsyncTask, ProcessStatus):
         self.nginx.generate_conf_file(webapps_list)
 
         # Defining service status change listener
-        self.nginx.add_status_listener(functools.partial(self._service_status_update_cb, "nginx"))
+        self.nginx.add_status_listener(functools.partial(self._service_status_update_cb, "nginx "))
         self.uwsgi.add_status_listener(functools.partial(self._service_status_update_cb, "uwsgi"))
 
     def _code_update_monitor_init(self):
