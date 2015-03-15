@@ -323,7 +323,7 @@ def analyze(location, webapp_folder):
     sys.path.append(location)
 
     print("INFO: Adding <%s/%s/lib> to python path." % (location, webapp_folder))
-    sys.path.append(location + webapp_folder + "/lib")
+    sys.path.append(location + "/" + webapp_folder + "/lib")
 
     try:
         webapp = Webapp(location, webapp_folder)

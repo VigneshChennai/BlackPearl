@@ -68,9 +68,9 @@ def this_app():
     urls.sort()
 
     preprocessors = [preprocessor['name'] for preprocessor in app.preprocessors]
-    preprocessors.sort(key=lambda prep: prep['name'])
+    preprocessors.sort()
     posthandlers = [posthandler['name'] for posthandler in app.posthandlers]
-    posthandlers.sort(key=lambda post: post['name'])
+    posthandlers.sort()
     return {
         "name": app.name,
         "url_prefix": app.url_prefix,

@@ -92,8 +92,9 @@ def __application__(environ, start_response):
 
         try:
             # Executing all the preprocessors defined and configured in webapp
+            url = urlpath.replace(webapp.url_prefix, "")
             for preprocessor in webapp.preprocessors:
-                preprocessor['func'](session, urlpath)
+                preprocessor['func'](session, url)
         except exceptions.RequestCannotBeProcessed as e:
             status = "200 ok"
             start_response(status, headers)
