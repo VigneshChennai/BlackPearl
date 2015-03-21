@@ -184,7 +184,11 @@ class Uwsgi(ProcessGroup):
                     "BLACKPEARL_ENCRYPT_KEY": self.security_key,
                     "BLACKPEARL_ENCRYPT_BLOCK_SIZE": str(self.security_block_size),
                     "BLACKPEARL_LISTEN": str(self.nginx_bind),
-                    "PYTHONPATH": ":".join(self.pypath + [webapp.location + "/lib"])
+                    "PYTHONPATH": ":".join(
+                        self.pypath + [os.path.join(webapp.location, "src"),
+                                       os.path.join(webapp.location, "lib"),
+                                       os.path.join(webapp.location, 'test')]
+                    )
                 }
             )
 
@@ -378,7 +382,7 @@ class AppServer(AsyncTask, ProcessStatus):
         self.uwsgi = Uwsgi(
             config.uwsgi, config.home + "/lib/wsgi.py", webapps_list,
             config.logs, config.run, config.security_key, config.security_block_size, config.listen,
-            [config.lib] + webapp_locations, config.uwsgi_options
+            [config.lib], config.uwsgi_options
         )
         self.uwsgi.generate_conf_file()
 

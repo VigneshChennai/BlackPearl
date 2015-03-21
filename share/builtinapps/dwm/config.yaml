@@ -1,55 +1,21 @@
-#!/usr/bin/env python
 
-# This file is part of BlackPearl.
-
-# BlackPearl is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-
-# BlackPearl is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-
-# You should have received a copy of the GNU General Public License
-# along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
-
-import os
-import sys
-
-
-def usage():
-    print("""
-Usage : newapp
-
-    newapp <appname>
-
-Example :
-    newapp my_new_app
-""")
-
-config_file = """
 ########################################################################################################################
 #                                    BlackPearl Application configuration file
 #
-# Full Name = "{fullappname}"
-# Author = "{author}"
-# Website = "{website}"
-# Email ID = "{emailid}"
+# Full Name = "Deployed Web Apps"
+# Author = "Vigneshwaran P"
+# Website = "home-vigneshchennai.rhcloud.com"
+# Email ID = "vigneshchennai@live.in"
 #
 ########################################################################################################################
 
-name : {fullappname}
+name : Deployed Web Apps
 
 # Description: Application Name.
 # Example : name = "My First BlackPearl Application"
 # Optional: Yes (if not specified: The folder name will be used as application name)
 
-desc : |
-    Add the application description here
-
-url_prefix : /{appname}
+url_prefix : /dwm
 
 # Description: URL Prefix for the web application.
 # Example : url_prefix = "/reservation"
@@ -60,6 +26,10 @@ url_prefix : /{appname}
 #          server starts.
 #       2. if url_prefix : / then the application will be deployed as root application.
 #
+
+desc : >
+    The DWM (Deployed Web Modules) application will exposes all the deployed web applications and it's JSON API's and,
+    provides an interface to invoke the api's and also execute the testcases as well if defined in the web application.
 
 handlers :
     - handlers
@@ -118,69 +88,3 @@ posthandlers : []
 #
 # Note: Posthandlers list defined here is for specifying the order of execution only. The python function must be
 #       decorated with @posthandler to define it as posthandler
-"""
-
-handlers_file = """#!/usr/bin/env python
-
-from BlackPearl.core import datatype
-from BlackPearl.core.decorators import weblocation
-
-
-@weblocation("helloworld")
-def helloworld():
-    ret = {
-            "msg" : "Hello world",
-            "desc" : "My first hello world BlackPearl web application"
-    }
-    return ret
-
-
-@weblocation("/calculator")
-def simple_calculator(operation: datatype.Options("add", "sub", "mul", "div"),
-                      value1: datatype.Float(),
-                      value2: datatype.Float()):
-    if operation == "add":
-        return value1 + value2
-    elif operation == "sub":
-        return value1 - value2
-    elif operation == "mul":
-        return value1 * value2
-    else:
-        return value1 / value2
-"""
-
-
-def main():
-
-    if len(sys.argv) != 2:
-        usage()
-        sys.exit(1)
-
-    if not os.access(".", os.W_OK):
-        print("ERROR: Unable to create folder on the current working directory")
-        sys.exit(1)
-
-    app_name = sys.argv[1]
-    full_app_name = input("Application Full Name : ")
-    author = input("Author Name : ")
-    website = input("Website : ")
-    email_id = input("Email Address : ")
-
-    os.mkdir(app_name)
-    os.mkdir(os.path.join(app_name, "lib"))
-    os.mkdir(os.path.join(app_name, "src"))
-    os.mkdir(os.path.join(app_name, "test"))
-    os.mkdir(os.path.join(app_name, "static"))
-
-    with open(os.path.join(app_name, 'config.yaml'), "w") as f:
-        f.write(config_file.format(appname=app_name,
-                                   fullappname=full_app_name,
-                                   author=author,
-                                   website=website,
-                                   emailid=email_id))
-
-    with open(os.path.join(app_name, "src", 'handlers.py'), "w") as f:
-        f.write(handlers_file)
-
-if __name__ == "__main__":
-    main()

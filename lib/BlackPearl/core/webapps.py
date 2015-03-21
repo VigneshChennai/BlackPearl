@@ -20,6 +20,7 @@ import sys
 import inspect
 import os
 import importlib
+import yaml
 
 from . import utils
 from .exceptions import RequestInvalid
@@ -30,7 +31,7 @@ class Webapp:
 
     def __init__(self, app_location, folder_name):
         self.id = ""
-        self.location = app_location + "/" + folder_name
+        self.location = os.path.join(app_location, folder_name)
         self.folder_name = folder_name
         self.name = None
         self.handlers = []
@@ -102,10 +103,23 @@ class Webapp:
 
         print("INFO: Initializing webapp folder <%s>" % self.folder_name)
         try:
-            config = importlib.import_module(self.folder_name + ".config")
-        except ImportError as e:
-            print("SEVERE: config.py not found inside webapp <%s> or error importing config file" % self.folder_name)
-            print("SEVERE: Actual error: %s" % str(e))
+            with open(os.path.join(self.location, "config.yaml")) as config_file:
+                loaded_config = yaml.load(config_file)
+
+            class Config:
+                pass
+
+            config = Config()
+            for key, value in loaded_config.items():
+                setattr(config, key, value)
+
+        except yaml.parser.ParserError:
+            print("SEVERE: config.yaml contains errors")
+            print("SEVERE: Actual error: ", traceback.format_exc())
+            return False
+        except:
+            print("SEVERE: config.yaml not found inside webapp <%s> or error loading it" % self.folder_name)
+            print("SEVERE: Actual error: ", traceback.format_exc())
             return False
 
         self._init_basics(config)
@@ -117,14 +131,20 @@ class Webapp:
             return False
 
         try:
-            try:
-                test = importlib.import_module(self.folder_name + ".test")
-            except ImportError as e:
-                print("WARNING: Failed to initialize testcase "
-                      "in the webapp <%s>" % self.name)
-                print("WARNING: Reason: %s" % str(e))
-            else:
-                self._init_testcases(test)
+            test_sets = [testset[:-3] for testset in os.listdir(os.path.join(self.location, "test"))
+                         if testset.endswith(".py")]
+
+            if len(test_sets) == 0:
+                print("INFO: No testsets defined.")
+            for test_set in test_sets:
+                try:
+                    print("INFO: Initializing test sets in <", test_set, ">", sep="")
+                    test = importlib.import_module(test_set)
+                except ImportError as e:
+                    print("WARNING: Failed to initialize testcase in the webapp", self.name)
+                    print("WARNING: Reason:", str(e))
+                else:
+                    self._init_testcases(test)
         except:
             print("ERROR: Initializing the testcases")
             print("ERROR: %s" % traceback.format_exc())
@@ -148,8 +168,7 @@ class Webapp:
             self.name = self.folder_name
 
         try:
-            desc_mod = importlib.import_module(self.folder_name)
-            self.desc = desc_mod.__doc__
+            self.desc = config.desc
         except AttributeError:
             self.desc = None
 
@@ -319,11 +338,11 @@ def analyze(location, webapp_folder):
         print("WARNING: Webapps folder<%s> not found. Ignoring.. " % location)
         return
 
-    print("INFO: Adding <%s> to python path." % location)
-    sys.path.append(location)
-
-    print("INFO: Adding <%s/%s/lib> to python path." % (location, webapp_folder))
-    sys.path.append(location + "/" + webapp_folder + "/lib")
+    for l in (os.path.join(location, webapp_folder, "src"),
+              os.path.join(location, webapp_folder, "lib"),
+              os.path.join(location, webapp_folder, 'test')):
+        print("INFO: Adding <%s> to python path." % l)
+        sys.path.append(l)
 
     try:
         webapp = Webapp(location, webapp_folder)
