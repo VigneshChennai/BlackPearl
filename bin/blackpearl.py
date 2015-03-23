@@ -24,7 +24,7 @@ import signal
 import time
 
 from BlackPearl.server import appserver
-from os.path import dirname, realpath
+from BlackPearl.common import configuration
 
 startup_notes = """
     BlackPearl is free software. License GPLv3+: GNU GPL version 3 or later
@@ -67,10 +67,10 @@ Actions:
 
 
 def start_server(daemon, config):
-
-    if os.access(config.run, os.F_OK):
+    path = config['path']
+    if os.access(path['run'], os.F_OK):
         try:
-            with open(os.path.join(config.run, "BlackPearl.pid")) as f:
+            with open(os.path.join(path['run'], "BlackPearl.pid")) as f:
                 pid = f.read()
             os.kill(int(pid), 0)
             print("BlackPearl is currently running. "
@@ -79,31 +79,32 @@ def start_server(daemon, config):
         except:
             pass
 
-        shutil.rmtree(config.run)
+        shutil.rmtree(path['run'])
 
-    os.mkdir(config.run)
-    os.mkdir(os.path.join(config.run, 'uwsgi'))
-    os.mkdir(os.path.join(config.run, 'nginx'))
-    os.mkdir(os.path.join(os.path.join(config.run, 'uwsgi'), 'pickle'))
-    if not os.access(config.logs, os.F_OK):
-        os.makedirs(config.logs)
-    if not os.access(os.path.join(config.logs, "uwsgi"), os.F_OK):
-        os.makedirs(os.path.join(config.logs, "uwsgi"))
+    os.mkdir(path['run'])
+    os.mkdir(os.path.join(path['run'], 'uwsgi'))
+    os.mkdir(os.path.join(path['run'], 'nginx'))
+    os.mkdir(os.path.join(os.path.join(path['run'], 'uwsgi'), 'pickle'))
+    if not os.access(path['log'], os.F_OK):
+        os.makedirs(path['log'])
+    if not os.access(os.path.join(path['log'], "uwsgi"), os.F_OK):
+        os.makedirs(os.path.join(path['log'], "uwsgi"))
 
     # open(os.path.join(os.path.join(config.run, 'uwsgi'), "worker_reload.file"), "w").close()
     print("\nStarting BlackPearl server ...")
-    print("Generating log files at %s" % config.logs)
+    print("Generating log files at %s" % path['log'])
     appserver.start(config, daemon)
 
 
 def stop_server(config):
     print("Stopping BlackPearl services in localhost "
           "running on <%s> user account" % pwd.getpwuid(os.getuid())[0])
-    if os.access(config.run, os.F_OK):
+    path = config['path']
+    if os.access(path['run'], os.F_OK):
         print("Trying to stop BlackPearl service .", end="")
         sys.stdout.flush()
         try:
-            with open(os.path.join(config.run, "BlackPearl.pid")) as f:
+            with open(os.path.join(path['run'], "BlackPearl.pid")) as f:
                 pid = f.read()
         except:
             print(traceback.format_exc())
@@ -132,69 +133,6 @@ def stop_server(config):
     else:
         print("BlackPearl service is not running.")
         return
-
-
-class Configuration:
-    __options__ = [
-        'home', 'share', 'lib', 'webapps', 'adminapps', 'builtinapps', 'run',
-        'logs', 'hostname', 'nginx', 'uwsgi',
-        'listen', 'security_key', 'security_block_size', 'uwsgi_options',
-        'builtinapps_enabled', 'adminapps_enabled'
-    ]
-
-    __config_loc__ = [
-        '/etc/blackpearl/config.py',
-        '%s/etc/config.py' % dirname(dirname(realpath(__file__)))
-
-    ]
-
-    __default_config_loc__ = [
-        '/usr/share/blackpearl/config.py',
-        '%s/share/config.py' % dirname(dirname(realpath(__file__)))
-    ]
-
-    def __init__(self, config=None):
-        default_config_loc = None
-        for loc in Configuration.__default_config_loc__:
-            if os.access(loc, os.F_OK):
-                default_config_loc = loc
-                break
-        if default_config_loc:
-            print("INFO: Using base configuration file at <%s> for initializing default values" % default_config_loc)
-        else:
-            print("SEVERE: Base configuration file not found!!")
-            raise FileNotFoundError("Base configuration file not found!! ")
-
-        l = {}
-        g = {"__file__": default_config_loc}
-        with open(default_config_loc) as file:
-            exec(file.read(), l, g)
-
-        config_loc = None
-        if config:
-            if os.access(config, os.F_OK):
-                config_loc = config
-            else:
-                raise FileNotFoundError("Specified configuration file not found: <%s>" % config)
-        else:
-            for loc in Configuration.__config_loc__:
-                if os.access(loc, os.F_OK):
-                    config_loc = loc
-                    break
-        if config_loc:
-            print("INFO: Using configuration file at <%s>" % config_loc)
-            g['__file__'] = config_loc
-            with open(config_loc) as file:
-                exec(file.read(), l, g)
-        else:
-            print("WARNING: Configuration file not found. Using only base configuration file.")
-
-        for option in Configuration.__options__:
-            try:
-                setattr(self, option, g[option])
-            except KeyError:
-                print("SEVERE: Option <%s> not defined in the configuration file" % option)
-                raise NameError("Option <%s> not defined in the configuration file")
 
 
 # used from https://gist.github.com/VigneshChennai/a79e84df57505d88c5b9
@@ -329,11 +267,12 @@ if __name__ == "__main__":
                 try:
                     config_path = p_args['-c']
                 except:
-                    configuration = Configuration()
+                    configuration = configuration.load('/etc/blackpearl/config.yaml')
                 else:
-                    configuration = Configuration(config=config_path)
+                    configuration = configuration.load(config_path)
             except Exception as e:
                 print("SEVERE: %s" % str(e))
+                print("SEVERE:", traceback.format_exc())
                 print("SEVERE: Error occurred. Stopping the blackpearl server.")
                 sys.exit(1)
             else:
@@ -344,9 +283,9 @@ if __name__ == "__main__":
                 try:
                     config_path = p_args['-c']
                 except:
-                    configuration = Configuration()
+                    configuration = configuration.load('/etc/blackpearl/config.yaml')
                 else:
-                    configuration = Configuration(config=config_path)
+                    configuration = configuration.load(config_path)
             except (FileNotFoundError, NameError) as e:
                 print("SEVERE: %s" % str(e))
                 print("SEVERE: Error occurred. Unable to stopping the blackpearl server.")

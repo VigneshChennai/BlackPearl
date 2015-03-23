@@ -24,6 +24,7 @@ import pickle
 import os
 import functools
 import pyinotify
+import base64
 
 
 from enum import Enum
@@ -185,9 +186,10 @@ class Uwsgi(ProcessGroup):
                     "BLACKPEARL_ENCRYPT_BLOCK_SIZE": str(self.security_block_size),
                     "BLACKPEARL_LISTEN": str(self.nginx_bind),
                     "PYTHONPATH": ":".join(
-                        self.pypath + [os.path.join(webapp.location, "src"),
-                                       os.path.join(webapp.location, "lib"),
-                                       os.path.join(webapp.location, 'test')]
+                        [self.pypath,
+                         os.path.join(webapp.location, "src"),
+                         os.path.join(webapp.location, "lib"),
+                         os.path.join(webapp.location, 'test')]
                     )
                 }
             )
@@ -233,12 +235,11 @@ class Uwsgi(ProcessGroup):
 
 
 class Nginx(Process):
-    def __init__(self, nginx_loc, hostname, listen, webapps_loc,
+    def __init__(self, nginx_loc, hostname, listen,
                  run_loc, share_loc, logs_loc):
         self.nginx_loc = nginx_loc
         self.hostname = hostname
         self.listen = listen
-        self.webapps_loc = webapps_loc
         self.run_loc = run_loc
         self.share_loc = share_loc
         self.logs_loc = logs_loc
@@ -312,7 +313,6 @@ class Nginx(Process):
         conf += "\n\n\t server {"
         conf += "\n\t\t listen %s;" % self.listen
         conf += "\n\t\t server_name %s;" % self.hostname
-        conf += "\n\t\t root '%s';" % self.webapps_loc
         conf += "\n\t\t access_log %s/nginx.access.log  main;" % self.logs_loc
 
         for loc in locations:
@@ -350,20 +350,22 @@ class AppServer(AsyncTask, ProcessStatus):
         AsyncTask.__init__(self)
         ProcessStatus.__init__(self, process_name="BlackPearl Server")
 
+        path = config['path']
+        server = config['server']
+        hostname = config['hostname']
+        listen = config['listen']
+        security = config['security']
+        uwsgi_options = config['uwsgi_options']
+
         self.config = config
         self.reloading_code = False
         self.reloading_conf = False
         self.modified_files = []
 
-        webapp_locations = [config.webapps]
-        if config.adminapps_enabled:
-            webapp_locations.append(config.adminapps)
-
-        if config.builtinapps_enabled:
-            webapp_locations.append(config.builtinapps)
+        webapp_locations = path['webapps']
 
         webapps_list = analyse_and_pickle_webapps(
-            "%s/uwsgi/pickle/" % config.run,
+            "%s/uwsgi/pickle/" % path['run'],
             *webapp_locations
         )
 
@@ -372,7 +374,7 @@ class AppServer(AsyncTask, ProcessStatus):
             raise NoApplicationDeployedError("No application deployed")
 
         for webapp in webapps_list:
-            webapp.socket = config.run + "/uwsgi/%s.socket" % webapp.id
+            webapp.socket = path['run'] + "/uwsgi/%s.socket" % webapp.id
 
         self.webapp_locations = webapp_locations
 
@@ -380,15 +382,16 @@ class AppServer(AsyncTask, ProcessStatus):
         self.ev_loop = asyncio.get_event_loop()
 
         self.uwsgi = Uwsgi(
-            config.uwsgi, config.home + "/lib/wsgi.py", webapps_list,
-            config.logs, config.run, config.security_key, config.security_block_size, config.listen,
-            [config.lib], config.uwsgi_options
+            server['uwsgi'], path['lib'] + "/wsgi.py", webapps_list,
+            path['log'], path['run'], security['key'],
+            security['block_size'], listen,
+            path['lib'], uwsgi_options
         )
         self.uwsgi.generate_conf_file()
 
         self.nginx = Nginx(
-            config.nginx, config.hostname, config.listen, config.webapps,
-            config.run, config.share, config.logs
+            server['nginx'], hostname, listen,
+            path['run'], path['share'], path['log']
         )
         self.nginx.generate_conf_file(webapps_list)
 
@@ -506,7 +509,7 @@ class AppServer(AsyncTask, ProcessStatus):
             yield from asyncio.sleep(2)
             if self.__status__ == Status.STARTED:
                 webapps_list = analyse_and_pickle_webapps(
-                    "%s/uwsgi/pickle/" % self.config.run,
+                    "%s/uwsgi/pickle/" % self.config['path']['run'],
                     *self.webapp_locations
                 )
 
@@ -523,7 +526,7 @@ class AppServer(AsyncTask, ProcessStatus):
                     modified_webapps = set(modified_webapps)
 
                     for webapp in webapps_list:
-                        webapp.socket = self.config.run + "/uwsgi/%s.socket" % webapp.id
+                        webapp.socket = self.config['path']['run'] + "/uwsgi/%s.socket" % webapp.id
 
                     self.nginx.generate_conf_file(webapps_list)
                     for m_webapp in modified_webapps:
@@ -600,7 +603,7 @@ class AppServer(AsyncTask, ProcessStatus):
 
 
 # From my gist - https://gist.github.com/VigneshChennai/35bb64d41e4a4beb2225
-def daemonize(log_folder, wd="/", umask=0):
+def daemonize(log_file, wd="/", umask=0):
     try:
         f = os.fork()
     except OSError as e:
@@ -631,13 +634,14 @@ def daemonize(log_folder, wd="/", umask=0):
         r = open("/dev/null", "r")
         os.dup2(r.fileno(), 0)
         buffering = 1  # line buffering
-        w = open(log_folder, "w", buffering=buffering)
+        w = open(log_file, "w", buffering=buffering)
         os.dup2(w.fileno(), 1)
         os.dup2(w.fileno(), 2)
 
 
 def start(config, daemon=False):
     print("Performing prechecks .... ", end="")
+    path = config['path']
     try:
         prechecks.check_all()
     except Exception as e:
@@ -650,8 +654,9 @@ def start(config, daemon=False):
         if daemon:
             print("INFO: Starting BlackPearl in daemon mode ...")
             try:
-                daemonize(log_folder=config.logs + "/server.log")
+                daemonize(log_file=path['log'] + "/server.log")
             except OSError:
+                print("ERROR:", traceback.format_exc())
                 print("ERROR: Unable to start the server in daemon mode. Exiting.")
                 sys.exit(1)
 
@@ -660,7 +665,7 @@ def start(config, daemon=False):
         logger.initialize()
 
         # Writing BlackPearl PID to file
-        with open(config.run + "/BlackPearl.pid", "w") as f:
+        with open(path['run'] + "/BlackPearl.pid", "w") as f:
             f.write(str(os.getpid()))
 
         ev_loop = asyncio.get_event_loop()

@@ -19,4 +19,5 @@ CURDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 export PYTHONPATH=$CURDIR/../lib
 
-"$CURDIR"/blackpearl.py shutdown
+cd "$CURDIR"/../
+"$CURDIR"/blackpearl.py -c "$CURDIR"/../etc/config.yaml shutdown

@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # This file is part of BlackPearl.
 
 # BlackPearl is free software: you can redistribute it and/or modify
@@ -15,16 +13,29 @@
 # You should have received a copy of the GNU General Public License
 # along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
 
-import platform
 
-if platform.linux_distribution()[0] in ('arch',):
-    # TODO: Need to add the list of distribution using python3 as default
-    uwsgi_options = {
-        'plugins': 'python',
-        'log-truncate': 'true'
-    }
-else:
-    uwsgi_options = {
-        'plugins': 'python3',
-        'log-truncate': 'true'
-    }
+path :
+    lib : /usr/lib/blackpearl
+    share : /usr/share/blackpearl
+    webapps :
+        - /usr/share/blackpearl/builtinapps
+        - /usr/share/blackpearl/webapps
+    run : /run/blackpearl
+    log : /var/log/blackpearl
+
+server:
+    nginx : /usr/sbin/nginx
+    uwsgi : /usr/sbin/uwsgi
+
+hostname : 'localhost'
+
+listen : 127.0.0.1:80
+
+security :
+    block_size : 16
+    auto_generate_key : true
+
+uwsgi_options :
+    plugins : python
+    log-truncate : true
+
