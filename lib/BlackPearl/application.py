@@ -26,7 +26,7 @@ import os
 from BlackPearl.core import sessions
 from BlackPearl.core import exceptions
 from BlackPearl.core import security
-from BlackPearl.testing import testing
+from BlackPearl import testing
 import base64
 
 
