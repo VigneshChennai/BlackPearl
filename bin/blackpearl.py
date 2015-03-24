@@ -22,9 +22,8 @@ import pwd
 import traceback
 import signal
 import time
-
-from BlackPearl.server import appserver
-from BlackPearl.common import configuration
+import yaml
+import base64
 
 startup_notes = """
     BlackPearl is free software. License GPLv3+: GNU GPL version 3 or later
@@ -41,6 +40,137 @@ startup_notes = """
 author = """
     Written by Vigneshwaran P (https://github.com/VigneshChennai)
 """
+
+__FILE_LOCATION__ = 'PORTABLE'
+
+# Hardcoded defaults
+CONFIG = {
+    "path": {
+        "lib": "/usr/lib/blackpearl",
+        "share": "/usr/share/blackpearl",
+        "webapps": [
+            "/usr/share/blackpearl/builtinapps"
+            "/usr/share/blackpearl/webapps"
+        ],
+        "run": "/run/blackpearl",
+        "log": "/var/log/blackpearl"
+    },
+
+    "server": {
+        "nginx": "/usr/sbin/nginx",
+        "uwsgi": "/usr/sbin/uwsgi"
+    },
+
+    "hostname": "localhost",
+
+    "listen": "127.0.0.1:80",
+
+    "security": {
+        "block_size": 16,
+        "auto_generate_key": True
+    },
+
+    "uwsgi_options": {
+        "plugins": "python",
+        "log-truncate": True
+    }
+}
+
+
+def validate_and_update(loaded_config, cwd):
+    category = ["path", "server", "hostname", "listen", "security", "uwsgi_options"]
+
+    for key in loaded_config.keys():
+        if key not in category:
+            raise ValueError("Unknown category '<%s>' in configuration file." % key)
+
+    path = ["lib", "share", "webapps", "run", "log"]
+    try:
+        path_dict = loaded_config['path']
+    except KeyError:
+        loaded_config['path'] = CONFIG['path'].copy()
+    else:
+        for key in path_dict.keys():
+            if key not in path:
+                raise ValueError("Unknown value '<%s>' under category <path> in configuration file." % key)
+
+        c = CONFIG['path'].copy()
+        c.update(path_dict)
+
+        for i in ('lib', 'share', 'run', 'log'):
+            if not c[i].startswith("/"):
+                c[i] = os.path.join(cwd, c[i])
+        t_list = []
+        for i in c['webapps']:
+            if i.startswith("/"):
+                t_list.append(i)
+            else:
+                t_list.append(os.path.join(cwd, i))
+        c['webapps'] = t_list
+        loaded_config['path'] = c
+
+    server = ["nginx", "uwsgi"]
+    try:
+        server_dict = loaded_config['server']
+    except KeyError:
+        loaded_config['server'] = CONFIG['server'].copy()
+    else:
+        for key in server_dict.keys():
+            if key not in server:
+                raise ValueError("Unknown value '<%s>' under category <server> in configuration file." % key)
+
+        c = CONFIG['server'].copy()
+        c.update(server_dict)
+        loaded_config['server'] = c
+
+    security = ["block_size", "auto_generate_key", "key"]
+    try:
+        security_dict = loaded_config['security']
+    except KeyError:
+        loaded_config['security'] = CONFIG['security'].copy()
+    else:
+        for key in security_dict.keys():
+            if key not in security:
+                raise ValueError("Unknown value '<%s>' under category <security> in configuration file." % key)
+
+        c = CONFIG['security'].copy()
+        c.update(security_dict)
+        loaded_config['security'] = c
+
+        if c['auto_generate_key']:
+            c['key'] = base64.b64encode(os.urandom(c['block_size']))
+        else:
+            try:
+                c['key']
+            except:
+                raise ValueError("Key is not defined under category <security> in configuration file.") from None
+
+    try:
+        loaded_config['hostname']
+    except KeyError:
+        loaded_config['hostname'] = CONFIG['hostname']
+
+    try:
+        loaded_config['listen']
+    except KeyError:
+        loaded_config['listen'] = CONFIG['listen']
+
+    try:
+        uwsgi_option_dict = loaded_config['uwsgi_options']
+    except KeyError:
+        loaded_config['uwsgi_options'] = CONFIG['uwsgi_options'].copy()
+    else:
+        c = CONFIG['uwsgi_options'].copy()
+        c.update(uwsgi_option_dict)
+        loaded_config['uwsgi_options'] = c
+
+
+def load(path, cwd=os.getcwd()):
+    with open(path) as file:
+        loaded_config = yaml.load(file)
+        validate_and_update(loaded_config=loaded_config, cwd=cwd)
+
+    return loaded_config
 
 
 class Color:
@@ -59,11 +189,12 @@ class Color:
 def usage():
     print("""Usage:
 
-Syntax: blackpearl.py [-c config_path] <action>
+Syntax: blackpearl.py [-c <config_path>] <action>
 
 Actions:
     1. startup
-    2. shutdown""")
+    2. shutdown
+    3. newapp <appname>""")
 
 
 def start_server(daemon, config):
@@ -234,15 +365,17 @@ class ArgumentParser:
 
 
 if __name__ == "__main__":
+
     try:
         apr = ArgumentParserRules(
-            with_arguments=['-c'],
+            with_arguments=['-c', 'newapp'],
             without_arguments=['startup', 'shutdown'],
             should_not_be_with={
                 'startup': ['shutdown'],
-                'shutdown': ['startup']
+                'shutdown': ['startup'],
+                'newapp': ['startup', 'shutdown', '-c']
             },
-            mandatory=[('startup', 'shutdown')]
+            mandatory=[('startup', 'shutdown', 'newapp')]
         )
         ap = ArgumentParser(apr, sys.argv[1:])
         p_args = ap.parse()
@@ -256,40 +389,43 @@ if __name__ == "__main__":
         print("SEVERE: %s" % traceback.format_exc())
         sys.exit(1)
     else:
+        try:
+            print("INFO: Initializing BlackPearl Configuration.")
+            try:
+                config_path = p_args['-c']
+            except:
+                if __FILE_LOCATION__ == "PORTABLE":
+                    configuration = load(os.path.join(
+                        os.path.dirname(os.path.dirname(os.path.realpath(__file__))), 'etc', 'config.yaml'),
+                        cwd=os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+                else:
+                    configuration = load('/etc/blackpearl/config.yaml')
+            else:
+                configuration = load(config_path)
+        except Exception as e:
+            print("SEVERE: %s" % str(e))
+            print("SEVERE:", traceback.format_exc())
+            print("SEVERE: Error occurred. Stopping the blackpearl server.")
+            sys.exit(1)
+
+        sys.path.append(configuration['path']['lib'])
+        from BlackPearl.server import appserver
+
         if "startup" in p_args:
             print(Color.BOLD + '\nBlackPearl' + Color.END)
             print(startup_notes)
             print(Color.BOLD + 'Author' + Color.END)
             print(author)
 
-            try:
-                print("INFO: Initializing server configuration.")
-                try:
-                    config_path = p_args['-c']
-                except:
-                    configuration = configuration.load('/etc/blackpearl/config.yaml')
-                else:
-                    configuration = configuration.load(config_path)
-            except Exception as e:
-                print("SEVERE: %s" % str(e))
-                print("SEVERE:", traceback.format_exc())
-                print("SEVERE: Error occurred. Stopping the blackpearl server.")
-                sys.exit(1)
-            else:
-                start_server(daemon=True, config=configuration)
+            start_server(daemon=True, config=configuration)
         elif "shutdown" in p_args:
+            stop_server(config=configuration)
+        elif "newapp" in p_args:
             try:
-                print("INFO: Fetching server configuration.")
-                try:
-                    config_path = p_args['-c']
-                except:
-                    configuration = configuration.load('/etc/blackpearl/config.yaml')
-                else:
-                    configuration = configuration.load(config_path)
-            except (FileNotFoundError, NameError) as e:
-                print("SEVERE: %s" % str(e))
-                print("SEVERE: Error occurred. Unable to stopping the blackpearl server.")
-                print("SEVERE: Exiting...")
-                sys.exit(1)
-            else:
-                stop_server(config=configuration)
+                print("INFO: Creating new webapp...")
+                args_copy = p_args.copy()
+                from BlackPearl.commands.newapp import invoke
+                invoke(**args_copy)
+            except:
+                print("SEVERE: Error occurred while creating new webapp.")
+                print("SEVERE:", traceback.format_exc())

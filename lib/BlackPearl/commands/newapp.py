@@ -150,17 +150,16 @@ def simple_calculator(operation: datatype.Options("add", "sub", "mul", "div"),
 """
 
 
-def main():
+def invoke(**args):
 
-    if len(sys.argv) != 2:
-        usage()
-        sys.exit(1)
+    # if len(args) != 2:
+    #    usage()
 
     if not os.access(".", os.W_OK):
         print("ERROR: Unable to create folder on the current working directory")
-        sys.exit(1)
+        raise Exception("Newapp creation failed.")
 
-    app_name = sys.argv[1]
+    app_name = args['newapp']
     full_app_name = input("Application Full Name : ")
     author = input("Author Name : ")
     website = input("Website : ")
@@ -181,6 +180,3 @@ def main():
 
     with open(os.path.join(app_name, "src", 'handlers.py'), "w") as f:
         f.write(handlers_file)
-
-if __name__ == "__main__":
-    main()
