@@ -19,14 +19,10 @@ import base64
 
 from Crypto.Cipher import AES
 
-# The below two variables will be initialized during the start of uwsgi
-BLOCK_SIZE = 0
-AES_KEY = ""
-
 PADDING = b"{"
 
 
-def encrypt(private_info):
+def encrypt(private_info, AES_KEY, BLOCK_SIZE):
     pad = lambda s: s + (BLOCK_SIZE - len(s) % BLOCK_SIZE) * PADDING
     # encrypt with AES, encode with base64
     encode_aes = lambda c, s: base64.b64encode(c.encrypt(pad(s)))
@@ -35,7 +31,7 @@ def encrypt(private_info):
     return encoded
 
 
-def decrypt(encrypted_str):
+def decrypt(encrypted_str, AES_KEY, BLOCK_SIZE):
     decode_aes = lambda c, e: c.decrypt(base64.b64decode(e)).rstrip(PADDING)
     cipher = AES.new(AES_KEY)
     decoded = decode_aes(cipher, encrypted_str)

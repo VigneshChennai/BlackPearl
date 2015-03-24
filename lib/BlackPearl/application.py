@@ -20,14 +20,14 @@ import json
 import cgi
 import pickle
 import inspect
+import os
+import base64
+
 from http.cookies import SimpleCookie
 
-import os
 from BlackPearl.core import sessions
 from BlackPearl.core import exceptions
-from BlackPearl.core import security
 from BlackPearl import testing
-import base64
 
 
 webapp = None
@@ -176,10 +176,10 @@ def __application__(environ, start_response):
 
 
 def initialize():
-    global webapp
+    global webapp, BLOCK_SIZE, AES_KEY
     # initializing the webapps from the pickled file.
-    security.BLOCK_SIZE = int(os.environ['BLACKPEARL_ENCRYPT_BLOCK_SIZE'])
-    security.AES_KEY = base64.b64decode(os.environ['BLACKPEARL_ENCRYPT_KEY'])
+    sessions.BLOCK_SIZE = int(os.environ['BLACKPEARL_ENCRYPT_BLOCK_SIZE'])
+    sessions.AES_KEY = base64.b64decode(os.environ['BLACKPEARL_ENCRYPT_KEY'])
     testing.listen = os.environ['BLACKPEARL_LISTEN']
     pickle_file = os.environ['BLACKPEARL_PICKLE_FILE']
     pfile = open("%s" % pickle_file, "rb")

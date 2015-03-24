@@ -18,7 +18,11 @@
 import time
 import pickle
 
-from BlackPearl.core.security import encrypt, decrypt
+from BlackPearl.common.security import encrypt, decrypt
+
+# The below two variables will be initialized during the start of uwsgi
+BLOCK_SIZE = 0
+AES_KEY = ""
 
 
 class Session:
@@ -32,11 +36,11 @@ class Session:
 
 def decode_session(session_b64_enc):
     if session_b64_enc:
-        return pickle.loads(decrypt(session_b64_enc))
+        return pickle.loads(decrypt(session_b64_enc, AES_KEY=AES_KEY, BLOCK_SIZE=BLOCK_SIZE))
     return None
 
 
 def encode_session(session):
     if session:
         session_bytes = pickle.dumps(session)
-        return encrypt(session_bytes)
+        return encrypt(session_bytes, AES_KEY=AES_KEY, BLOCK_SIZE=BLOCK_SIZE)
