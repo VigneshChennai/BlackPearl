@@ -63,3 +63,9 @@ class Session:
     @webname("formatlistparamtest")
     def formatlistparamtest(self, value: datatype.FormatList("^[a-zA-Z ,.'-]+$")):
         return "Valid data <%s>" % value
+
+    @webname("htmlfileoutputtest")
+    def htmlfileoutputtest(self):
+        yield ("Content-Type", "text/html")
+        yield "<!DOCTYPE html>\n<html><head> <meta charset='UTF-8'><title>File output</title></head>" \
+              "<body><h2>fileoutput testing</h2></body></html>".encode("UTF-8")

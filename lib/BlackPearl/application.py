@@ -23,9 +23,10 @@ import inspect
 import os
 import base64
 
+from BlackPearl import testing
 from BlackPearl.core import sessions
 from BlackPearl.core import exceptions
-from BlackPearl import testing
+from BlackPearl.core import utils
 from BlackPearl.core.exceptions import RequestInvalid
 
 
@@ -70,6 +71,22 @@ def invoke_posthandlers(urlpath, session, rets):
             "desc": "Exception occurred in posthandler. Error: <%s>" % e
         }
         return error
+
+
+def handle_request(module, session, parameter):
+        """This function handles the user request"""
+        func = module['func']
+        signature = module['signature']
+
+        try:
+            parameter = utils.validate_parameter(signature, parameter)
+        except Exception as e:
+            return {
+                "status": -201,
+                "desc": str(e)
+            }
+
+        return func(session, parameter)
 
 
 def return_to_client(start_response, headers, session, data):
@@ -122,49 +139,82 @@ def __application__(environ, start_response):
             start_response(status, headers + [('Allow', ('POST', 'GET'))])
             yield str("Method<%s> is not allowed" % method).encode('UTF-8')
 
-        elif urlpath not in webapp.webmodules:
-            status = '404 Requested URL not found'
-            start_response(status, headers)
-            yield str("Requested URL not found : %s" % (urlpath)).encode('utf-8')
         else:
-            # Parse/Initialize session object.
-            session = sessions.parse_session(environ=environ)
-            headers = [('Content-Type', "text/json")]
-
-            error = invoke_preprocessors(urlpath=urlpath, session=session)
-            if not error:
-                # Invoking the request handler for this the URL
-                try:
-                    output = webapp.handle_request(session, urlpath, form_values)
-
-                    if inspect.isgenerator(output):
-                        for data_segment in output:
-                            yield data_segment
-                        return
-                    else:
-                        rets = {
-                            "status": 0,
-                            "data": output
-                        }
-                except RequestInvalid as ri:
-                    rets = {
-                        "status": -202,
-                        "desc": str(ri)
-                    }
-                except Exception:
-                    error = traceback.format_exc()
-                    rets = {
-                        "status": -203,
-                        "desc": error
-                    }
-                else:
-                    error = invoke_posthandlers(urlpath=urlpath, session=session, rets=rets)
-                    if error:
-                        rets = error
+            try:
+                module = webapp.webmodules[urlpath]
+            except:
+                status = '404 Requested URL not found'
+                start_response(status, headers)
+                yield str("Requested URL not found : %s" % (urlpath)).encode('utf-8')
             else:
-                rets = error
-            for i in return_to_client(start_response=start_response, headers=headers, session=session, data=rets):
-                yield i
+                # Parse/Initialize session object.
+                session = sessions.parse_session(environ=environ)
+                headers = [('Content-Type', "text/json")]
+
+                error = invoke_preprocessors(urlpath=urlpath, session=session)
+                if error:
+                    for i in return_to_client(start_response=start_response, headers=headers,
+                                              session=session, data=error):
+                        yield i
+                else:
+                    # Invoking the request handler for this the URL
+                    try:
+                        output = handle_request(module=module, session=session, parameter=form_values)
+                    except RequestInvalid as ri:
+                        rets = {
+                            "status": -202,
+                            "desc": str(ri)
+                        }
+                        for i in return_to_client(start_response=start_response, headers=headers,
+                                                  session=session, data=rets):
+                            yield i
+                    except Exception:
+                        error = traceback.format_exc()
+                        rets = {
+                            "status": -203,
+                            "desc": error
+                        }
+                        for i in return_to_client(start_response=start_response, headers=headers,
+                                                  session=session, data=rets):
+                            yield i
+                    else:
+                        if inspect.isgenerator(output):
+                            status = "200 ok"
+                            headers = []
+                            try:
+                                remaining = None
+                                for data_segment in output:
+                                    if type(data_segment) == tuple:
+                                        headers.append(data_segment)
+                                    else:
+                                        remaining = data_segment
+                            except:
+                                status = "500 Internal server error. Check the server logs"
+                                print("ERROR: Error occurred while setting header for file output.")
+                                print("ERROR:", traceback.format_exc())
+                                start_response(status, [])
+                                yield traceback.format_exc().encode('UTF-8')
+
+                            try:
+                                start_response(status, headers)
+                                yield remaining
+                                for data_segment in output:
+                                    yield data_segment
+                            except:
+                                print("ERROR: Error occurred while returning file output.")
+                                print("ERROR:", traceback.format_exc())
+                        else:
+                            rets = {
+                                "status": 0,
+                                "data": output
+                            }
+                            error = invoke_posthandlers(urlpath=urlpath, session=session, rets=rets)
+                            if error:
+                                rets = error
+                            for i in return_to_client(start_response=start_response, headers=headers,
+                                                      session=session, data=rets):
+                                yield i
+
     except:
         error = traceback.format_exc()
         status = '200 ok'

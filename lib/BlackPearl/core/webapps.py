@@ -63,25 +63,6 @@ class Webapp:
                     for key, testsets in self.testsets.items()]
                )
 
-    def handle_request(self, session, url, parameter):
-        """This function handles the user request"""
-        try:
-            module = self.webmodules[url]
-            func = module['func']
-            signature = module['signature']
-        except:
-            raise ValueError("Invalid url : " + url)
-
-        try:
-            parameter = utils.validate_parameter(signature, parameter)
-        except Exception as e:
-            return {
-                "status": -201,
-                "desc": str(e)
-            }
-
-        return func(session, parameter)
-
     def initialize(self):
         """initializes the webapp"""
 
