@@ -23,7 +23,6 @@ import importlib
 import yaml
 
 from . import utils
-from .exceptions import RequestInvalid
 
 
 class Webapp:
@@ -80,23 +79,8 @@ class Webapp:
                 "status": -201,
                 "desc": str(e)
             }
-        try:
-            ret = {
-                "status": 0,
-                "data": func(session, parameter),
-            }
-            return ret
-        except RequestInvalid as ri:
-            return {
-                "status": -202,
-                "desc": str(ri)
-            }
-        except Exception:
-            error = traceback.format_exc()
-            return {
-                "status": -203,
-                "desc": error
-            }
+
+        return func(session, parameter)
 
     def initialize(self):
         """initializes the webapp"""

@@ -18,6 +18,8 @@
 import time
 import pickle
 
+from http.cookies import SimpleCookie
+
 from BlackPearl.common.security import encrypt, decrypt
 
 # The below two variables will be initialized during the start of uwsgi
@@ -44,3 +46,41 @@ def encode_session(session):
     if session:
         session_bytes = pickle.dumps(session)
         return encrypt(session_bytes, AES_KEY=AES_KEY, BLOCK_SIZE=BLOCK_SIZE)
+
+
+def parse_session(environ):
+    # session.__status__ attribute can have one among the below three
+    # values
+    #
+    # session.__status__ = "fetched" --> When the session is not expired
+    # session.__status__ = "recreated" --> When the session is expired
+    # session.__status__ = "created" --> When the session is not
+
+    cookie = SimpleCookie()
+    cookie.load(environ.get("HTTP_COOKIE", ""))
+
+    try:
+        cookie = SimpleCookie()
+        cookie.load(environ.get("HTTP_COOKIE", ""))
+
+        # trying to get the cookie encrypted "session" from the cookie object
+        # if not there, exception raised
+        session_b64_enc = cookie["session"].value
+
+        # trying to decode the encrypted session value
+        session = decode_session(session_b64_enc)
+
+        # if the session is None, then "session' value in the cookie
+        # is invalid or it got expired.
+        if not session:
+            session = Session()
+            session.__status__ = "recreated"
+        else:
+            session.__status__ = "fetched"
+    except:
+        # When there is not session value in cookie,
+        # new session cookie is created.
+        session = Session()
+        session.__status__ = "created"
+
+    return session
