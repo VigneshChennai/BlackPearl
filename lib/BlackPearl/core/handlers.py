@@ -23,18 +23,23 @@ from BlackPearl.core.exceptions import RequestInvalid
 @weblocation('/__test_run__')
 def run_testset(url, name):
     webapp = application.webapp
-    if url not in webapp.webmodules:
-        raise RequestInvalid("The URL <%s> not found" % url)
+    try:
+        module = webapp.webmodules[url]
+    except KeyError:
+        raise RequestInvalid("The URL <%s> not found" % url) from None
 
     _testset = None
-    _testsets = webapp.testsets[url]
+    try:
+        _testsets = webapp.testsets[url]
+    except KeyError:
+        raise RequestInvalid("No testsets found for url <%s>" % url)
     for testset in _testsets:
         if testset['name'] == name:
             _testset = testset
             break
 
     if _testset:
-        return _testset['func']()
+        return _testset['func'](module['type'])
     else:
         raise RequestInvalid("The name <%s> not found" % name)
 
@@ -42,8 +47,10 @@ def run_testset(url, name):
 @weblocation('/__test_run_all__')
 def run_all_testset(url):
     webapp = application.webapp
-    if url not in webapp.webmodules:
-        raise RequestInvalid("The URL <%s> not found" % url)
+    try:
+        module = webapp.webmodules[url]
+    except KeyError:
+        raise RequestInvalid("The URL <%s> not found" % url) from None
 
     ret = []
     try:
@@ -53,7 +60,7 @@ def run_all_testset(url):
     for testset in _testsets:
         ret.append({
             "TestSet": testset['name'],
-            "data": testset['func']()
+            "data": testset['func'](module['type'])
         })
     return ret
 

@@ -182,12 +182,12 @@ class Options(Type):
         return "Option datatype"
 
     def __str__(self):
-        return "It is defined to accept only one of the <%s> as value" % (str(self.values))
+        return "It is defined to accept only one of the <%s> as value" % self.values
 
 
 class OptionsList(ListType, Options):
     def __init__(self, *values):
-        Options.__init__(self, values)
+        Options.__init__(self, *values)
 
     def __repr__(self):
         return "Option List datatype"

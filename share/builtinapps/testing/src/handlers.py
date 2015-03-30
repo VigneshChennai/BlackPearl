@@ -69,3 +69,9 @@ class Session:
         yield ("Content-Type", "text/html")
         yield "<!DOCTYPE html>\n<html><head> <meta charset='UTF-8'><title>File output</title></head>" \
               "<body><h2>fileoutput testing</h2></body></html>".encode("UTF-8")
+
+    @webname("fileinputtest")
+    def fileinput(self, file:datatype.File()):
+        return {
+            "content": file['file'].read().decode()
+        }

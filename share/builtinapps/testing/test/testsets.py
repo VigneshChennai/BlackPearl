@@ -176,6 +176,7 @@ def testing_list2():
             "value": [str(i) + "sd", i]
         })
         test(result['status'], -201)
+
     print("'String value to integer' test completed successfully")
     print("Testing: Floating value to Integer")
     for i in range(0, 1000):
@@ -265,3 +266,12 @@ def testing_list8():
         "value": ["007", "234"]
     })
     test(result['status'], -201)
+
+
+@testset(name="File input test", webmodule="/servertesting/fileinputtest")
+def fileinput():
+    with open("/tmp/temp.file", "w") as f:
+        f.write("Helloooo world")
+
+    result = testcase({}, files={"file": open("/tmp/temp.file")})
+    print("INFO: Result =",result)

@@ -81,10 +81,7 @@ def handle_request(module, session, parameter):
         try:
             parameter = utils.validate_parameter(signature, parameter)
         except Exception as e:
-            return {
-                "status": -201,
-                "desc": str(e)
-            }
+            raise ParametersInvalid(str(e)) from None
 
         return func(session, parameter)
 
@@ -120,6 +117,11 @@ def return_to_client(start_response, headers, session, data):
             headers.append(('Set-Cookie', "session=%s" % sess_value))
             start_response(status, headers)
             yield json_rets.encode('UTF-8')
+
+
+class ParametersInvalid(Exception):
+    """This exception should be raised when invalid parameters are received"""
+    pass
 
 
 def __application__(environ, start_response):
@@ -160,6 +162,14 @@ def __application__(environ, start_response):
                     # Invoking the request handler for this the URL
                     try:
                         output = handle_request(module=module, session=session, parameter=form_values)
+                    except ParametersInvalid as e:
+                        rets = {
+                            "status": -201,
+                            "desc": str(e)
+                        }
+                        for i in return_to_client(start_response=start_response, headers=headers,
+                                                  session=session, data=rets):
+                            yield i
                     except RequestInvalid as ri:
                         rets = {
                             "status": -202,
@@ -194,15 +204,15 @@ def __application__(environ, start_response):
                                 print("ERROR:", traceback.format_exc())
                                 start_response(status, [])
                                 yield traceback.format_exc().encode('UTF-8')
-
-                            try:
-                                start_response(status, headers)
-                                yield remaining
-                                for data_segment in output:
-                                    yield data_segment
-                            except:
-                                print("ERROR: Error occurred while returning file output.")
-                                print("ERROR:", traceback.format_exc())
+                            else:
+                                try:
+                                    start_response(status, headers)
+                                    yield remaining
+                                    for data_segment in output:
+                                        yield data_segment
+                                except:
+                                    print("ERROR: Error occurred while returning file output.")
+                                    print("ERROR:", traceback.format_exc())
                         else:
                             rets = {
                                 "status": 0,

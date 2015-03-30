@@ -19,9 +19,11 @@
 import json
 import inspect
 import traceback
+
+import requests
+
 from time import strftime
-import urllib.request
-import urllib.parse
+
 
 
 __all__ = ['testset', 'testcase', 'test', 'TestcaseFailed',
@@ -37,12 +39,11 @@ class TestsetInvoker:
         self.name = name
         self.webmodule = webmodule
 
-    def __call__(self):
+    def __call__(self, module_type):
         # The below three variable will used for inspection from testcase
         caller = self.__call__
         webmodule = self.webmodule
-        opener = urllib.request.build_opener(
-            urllib.request.HTTPCookieProcessor())
+        opener = requests.Session()
 
         testset_outs = ['[%s] %s' % (strftime("%Y-%m-%d %H:%M:%S"), "Invoking the Testset<%s>" % self.name)]
 
@@ -121,7 +122,7 @@ def testset(name, webmodule):
     return alt_func
 
 
-def testcase(testcase_input):
+def testcase(testcase_input, files=None):
     """testcase(input) function must be used within a testset.
 
 input - should be a dict object containing the input values for webmodule"""
@@ -135,6 +136,7 @@ input - should be a dict object containing the input values for webmodule"""
         webmodule = prev_frame.f_locals['webmodule']
         # getting the opener object for this current testcase run.
         opener = prev_frame.f_locals['opener']
+        module_type = prev_frame.f_locals['module_type']
     except:
         raise InvalidTestcaseInvoke("The testcase function must be invoked "
                                     "from a function decorated with"
@@ -142,8 +144,11 @@ input - should be a dict object containing the input values for webmodule"""
     else:
         try:
             # invoking the webmodule
-            rets = _invoke_webmodule(opener, webmodule, testcase_input)
-            return json.loads(rets.decode())
+            rets = _invoke_webmodule(opener, webmodule, testcase_input, files)
+            if module_type == "json":
+                return json.loads(rets.decode())
+            else:
+                return rets
         except:
             # in case any error occurred during invoking of webmodule
             raise TestcaseError("Error: %s" % traceback.format_exc())
@@ -158,29 +163,13 @@ def test(first, second):
                              ": <%s> Return value : <%s>" % (second, first))
 
 
-def _invoke_webmodule(opener, url, testcase_input):
+def _invoke_webmodule(opener, url, testcase_input, files=None):
     """Internal function which invokes the webmodule"""
-    # quote function will be used to quote the values passed as
-    # param to the webmodule
-
-    t_inputs = []
-    for key, value in testcase_input.items():
-        if isinstance(value, str):
-            t_inputs.append((key, value))
-        else:
-            try:
-                for v in value:
-                    t_inputs.append((key, v))
-            except:
-                t_inputs.append((key, value))
 
     # invoking the webmodule.
     # TODO: https protocol need to be supported.
-    # TODO: Support file and post form submit method.
-
-    response = opener.open("http://" + listen + url,
-                           urllib.parse.urlencode(t_inputs).encode('UTF-8'))
-    return response.read()
+    response = opener.post("http://" + listen + url, data=testcase_input, files=files)
+    return response.content
 
 
 def testprint(*args, **kwargs):
