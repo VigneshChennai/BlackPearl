@@ -94,6 +94,7 @@ def weblocation(parameter):
                     "url": url,
                     "func": invoker,
                     "handler": method,
+                    "type": "file" if inspect.isgeneratorfunction(method) else "json",
                     "arguments": utils.get_signature_details(method),
                     "desc": target.__doc__
                 })
@@ -106,6 +107,7 @@ def weblocation(parameter):
                 "url": parameter,
                 "func": FunctionInvoker(target),
                 "handler": target,
+                "type": "file" if inspect.isgeneratorfunction(target) else "json",
                 "arguments": utils.get_signature_details(target),
                 "desc": target.__doc__
             }

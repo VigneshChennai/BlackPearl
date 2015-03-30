@@ -255,7 +255,7 @@
                                                  style="overflow:visible">
                                                 <div class="panel-body nopadding no-border-top">
                                                     <form class="form-horizontal" role="form" id="invoke-form"
-                                                          enctype="multipart/form-data">
+                                                          enctype="multipart/form-data" method="POST">
                                                         <table class="fullsize">
                                                             <tr>
                                                                 <td class="fixed-col-md-9 " valign="top"
@@ -275,9 +275,10 @@
                                                                         <tr>
                                                                             <td class="fullsize" valign="centre"
                                                                                 align="center">
-                                                                                <button type="button"
+                                                                                <button type="submit"
                                                                                         class="btn btn-primary invoke_btn execute_btn"
-                                                                                        onclick="invoke()">Invoke
+                                                                                        onclick="return invoke()"
+                                                                                  	id="module_invoke_btn">Invoke
                                                                                 </button>
                                                                             </td>
                                                                         </tr>

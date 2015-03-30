@@ -104,6 +104,7 @@ def signature(url):
 
     return {
         "signature": webapp.webmodules[url]['arguments'],
+        "type": webapp.webmodules[url]['type'],
         "desc": webapp.webmodules[url]['desc'],
         "testsets": ts
     }

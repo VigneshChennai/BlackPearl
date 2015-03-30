@@ -65,6 +65,7 @@ strings = {
 var _applications = [];
 var _current_module = null;
 var _current_app_id = 0;
+var _current_module_type = null;
 
 function load() {
     var future = initialize_applications();
@@ -91,7 +92,7 @@ function initialize_applications() {
                     _applications[0] = data.data;
                     if (ret.success) {
                         ret.success();
-                    } 
+                    }
                 }else {
                     if (ret.failure) {
                         ret.failure();
@@ -173,6 +174,16 @@ function load_signature(url) {
             load_testsets(data.data.testsets);
             generate_form_elements(data.data.signature);
             _current_module=url;
+            _current_module_type = data.data.type;
+            $("#invoke-form").attr("action", url);
+
+            if (data.data.type == "file") {
+                $("#module-output-panel").hide();
+                $("#module_invoke_btn").html("Get File")
+            } else {
+                $("#module-output-panel").show();
+                $("#module_invoke_btn").html("Invoke")
+            }
     });
 }
 
@@ -222,6 +233,7 @@ function openmodule(url, object) {
     //$("#modules-panel").click();
     //$("#modules-details-panel").click();
     load_signature(url);
+
 }
 
 function generate_form_elements(args) {
@@ -264,34 +276,40 @@ function generate_form_elements(args) {
 }
 
 function invoke() {
-    var output_tmpl = $("#output-tmpl").html();
-    var execute_all = $("#testcase-execute-all-btn").prop( "disabled");
-    $(".execute_btn").prop( "disabled", true );
-    $("#module-output-body").html('<pre style="min-height:200px"><div class="spinner"> ' +
-    '<div class="spinner-container container1"> <div class="circle1"></div> <div class="circle2"></div> ' +
-    '<div class="circle3"></div> <div class="circle4"></div> </div> <div class="spinner-container container2"> ' +
-    '<div class="circle1"></div> <div class="circle2"></div> <div class="circle3"></div> <div class="circle4"></div> ' +
-    '</div> <div class="spinner-container container3"> <div class="circle1"></div> <div class="circle2"></div> ' +
-    '<div class="circle3"></div> <div class="circle4"></div> </div></div></pre>');
-    $.post( _current_module, $('#invoke-form').serialize(), function(data) {
+    if (_current_module_type == "json") {
+        var output_tmpl = $("#output-tmpl").html();
+        var execute_all = $("#testcase-execute-all-btn").prop( "disabled");
+        $(".execute_btn").prop( "disabled", true );
+        $("#module-output-body").html('<pre style="min-height:200px"><div class="spinner"> ' +
+        '<div class="spinner-container container1"> <div class="circle1"></div> <div class="circle2"></div> ' +
+        '<div class="circle3"></div> <div class="circle4"></div> </div> <div class="spinner-container container2"> ' +
+        '<div class="circle1"></div> <div class="circle2"></div> <div class="circle3"></div> <div class="circle4"></div> ' +
+        '</div> <div class="spinner-container container3"> <div class="circle1"></div> <div class="circle2"></div> ' +
+        '<div class="circle3"></div> <div class="circle4"></div> </div></div></pre>');
 
-        var output_panel = $("#module-output-panel");
-         if(data.status == 0) {
-            output_panel.removeClass();
-            output_panel.addClass("panel panel-success top20");
-         } else {
-            output_panel.removeClass();
-            output_panel.addClass("panel panel-danger top20");
-         }
-         var rendered = Mustache.render(output_tmpl, {"output" :JSON.stringify(data, null, 4)});
-         $("#module-output-body").html(rendered);
-        $(".execute_btn").prop( "disabled", false);
-       },
-       'json' // I expect a JSON response
-    ).always(function() {
+        $.post(_current_module, $('#invoke-form').serialize(), function(data) {
+
+            var output_panel = $("#module-output-panel");
+             if(data.status == 0) {
+                output_panel.removeClass();
+                output_panel.addClass("panel panel-success top20");
+             } else {
+                output_panel.removeClass();
+                output_panel.addClass("panel panel-danger top20");
+             }
+             var rendered = Mustache.render(output_tmpl, {"output" :JSON.stringify(data, null, 4)});
+             $("#module-output-body").html(rendered);
             $(".execute_btn").prop( "disabled", false);
-            $("#testcase-execute-all-btn").prop( "disabled", execute_all);
-        });
+           },
+           'json' // I expect a JSON response
+        ).always(function() {
+                $(".execute_btn").prop( "disabled", false);
+                $("#testcase-execute-all-btn").prop( "disabled", execute_all);
+            });
+        return false;
+    } else {
+        return true;
+    }
 }
 
 function display_handlers() {
