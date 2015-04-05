@@ -273,5 +273,5 @@ def fileinput():
     with open("/tmp/temp.file", "w") as f:
         f.write("Helloooo world")
 
-    result = testcase({}, files={"file": open("/tmp/temp.file")})
+    result = testcase({"value": "Vignesh rockz"}, files={"file": open("/tmp/temp.file")})
     print("INFO: Result =",result)

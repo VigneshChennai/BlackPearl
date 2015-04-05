@@ -16,26 +16,38 @@
 # along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
 
 import re
+from io import StringIO
+
+
+class _Field:
+    pass
 
 
 def isvalid(datatype, data):
     """Function to validate the data passed in the request."""
-    try:
-        return datatype.__is_valid__(data)
-    except AttributeError as ae:
-        raise Exception("DataType <" + str(datatype.__class__.__name__)
-                        + "> is a invalid to be used in web "
-                        + "method annotations.\nActual error: " + str(ae))
+    if hasattr(datatype, "__is_valid__"):
+        try:
+            return datatype.__is_valid__(data)
+        except:
+            raise Exception("Error while validating the data using DataType <" + str(datatype.__class__.__name__) + ">")
+    else:
+        raise Exception("DataType <" + str(datatype.__class__.__name__) + "> is a invalid to be used in web "
+                                                                          "method annotations.")
 
 
 def parse(datatype, data):
     if data.file:
-        if not isinstance(datatype, File):
+        # Added to handle "multipart/form-data"
+        if isinstance(data.file, StringIO):
+            data = data.file.getvalue()
+        elif not isinstance(datatype, File):
             raise Exception("%s, but <File datatype> is given." % (str(datatype)))
+    else:
+        data = data.value
     if isvalid(datatype, data):
         return datatype.__parse__(data)
     else:
-        raise Exception("%s, but <%s> is given." % (str(datatype), str(data.value)))
+        raise Exception("%s, but <%s> is given." % (str(datatype), str(data)))
 
 
 class Type:
@@ -54,7 +66,7 @@ class ListType(Type):
 
 class File(Type):
     def __is_valid__(self, data):
-        if data.file:
+        if hasattr(data, "file"):
             return True
         else:
             return False
@@ -81,13 +93,13 @@ class FileList(ListType, File):
 class Float(Type):
     def __is_valid__(self, data):
         try:
-            float(data.value)
+            float(data)
             return True
         except:
             return False
 
     def __parse__(self, data):
-        return float(data.value)
+        return float(data)
 
     def __repr__(self):
         return "Float datatype"
@@ -104,13 +116,13 @@ class FloatList(ListType, Float):
 class Integer(Type):
     def __is_valid__(self, data):
         try:
-            int(data.value)
+            int(data)
             return True
         except:
             return False
 
     def __parse__(self, data):
-        return int(data.value)
+        return int(data)
 
     def __repr__(self):
         return "Integer datatype"
@@ -133,7 +145,7 @@ class Format(Type):
 
     def __is_valid__(self, data):
         try:
-            if self.pattern.match(data.value):
+            if self.pattern.match(data):
                 return True
             else:
                 return False
@@ -141,7 +153,7 @@ class Format(Type):
             return False
 
     def __parse__(self, data):
-        return data.value
+        return data
 
     def __repr__(self):
         return "Regex datatype"
@@ -168,7 +180,7 @@ class Options(Type):
 
     def __is_valid__(self, data):
         try:
-            if data.value in self.values:
+            if data in self.values:
                 return True
             else:
                 return False
@@ -176,7 +188,7 @@ class Options(Type):
             return False
 
     def __parse__(self, data):
-        return data.value
+        return data
 
     def __repr__(self):
         return "Option datatype"

@@ -71,7 +71,13 @@ class Session:
               "<body><h2>fileoutput testing</h2></body></html>".encode("UTF-8")
 
     @webname("fileinputtest")
-    def fileinput(self, file:datatype.File()):
+    def fileinput(self, file:datatype.File(), value):
+        few_bytes = file['file'].read(500);
+        try:
+            data = few_bytes.decode('UTF-8')
+        except:
+            data = "Binary File"
         return {
-            "content": file['file'].read().decode()
+            "file": data,
+            "value": value
         }

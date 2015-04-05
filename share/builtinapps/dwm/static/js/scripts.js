@@ -262,9 +262,10 @@ function generate_form_elements(args) {
         }
 
         if(arg.type == "File datatype") {
-            arg.htmltype = "File";
+            arg.htmltype = "file";
+            arg.file_type = true;
         } else {
-            arg.htmltype = "Text";
+            arg.htmltype = "text";
         }
         form_inputs.push(Mustache.render(input_tmpl, arg));
     });
@@ -287,6 +288,47 @@ function invoke() {
         '</div> <div class="spinner-container container3"> <div class="circle1"></div> <div class="circle2"></div> ' +
         '<div class="circle3"></div> <div class="circle4"></div> </div></div></pre>');
 
+        var hasFile = false;
+        formData = new FormData(document.getElementById("invoke-form"));
+        $('#invoke-form').find(':input').each(function() {
+            if($(this).attr("name")) {
+                if ($(this).attr("type") == 'file') {
+                    hasFile = true;
+                }
+            }
+        });
+        previous = $("#module_invoke_btn").html()
+        if(hasFile) {
+            $("#module_invoke_btn").html("Uploading...");
+        }
+        $.ajax({
+            url: _current_module,
+            data: formData,
+            processData: false,
+            type: 'POST',
+            contentType: false,
+            success: function ( data ) {
+                var output_panel = $("#module-output-panel");
+                if(data.status == 0) {
+                   output_panel.removeClass();
+                   output_panel.addClass("panel panel-success top20");
+                } else {
+                   output_panel.removeClass();
+                   output_panel.addClass("panel panel-danger top20");
+                }
+                var rendered = Mustache.render(output_tmpl, {"output" :JSON.stringify(data, null, 4)});
+                $("#module-output-body").html(rendered);
+                $(".execute_btn").prop( "disabled", false);
+            },
+            dataType: 'json'
+        }).always(function() {
+                if(hasFile) {
+                    $("#module_invoke_btn").html(previous);
+                }
+                $(".execute_btn").prop( "disabled", false);
+                $("#testcase-execute-all-btn").prop( "disabled", execute_all);
+        });
+        /*
         $.post(_current_module, $('#invoke-form').serialize(), function(data) {
 
             var output_panel = $("#module-output-panel");
@@ -305,7 +347,7 @@ function invoke() {
         ).always(function() {
                 $(".execute_btn").prop( "disabled", false);
                 $("#testcase-execute-all-btn").prop( "disabled", execute_all);
-            });
+            });*/
         return false;
     } else {
         return true;

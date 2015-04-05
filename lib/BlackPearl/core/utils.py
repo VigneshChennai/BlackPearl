@@ -18,6 +18,7 @@
 import sys
 import inspect
 import traceback
+from io import StringIO
 
 from . import datatype
 
@@ -61,11 +62,14 @@ def validate_parameter(signature, parameter):
             if annotation is inspect.Signature.empty:
                 # The value.file will None if it not a file
                 if value.file:
-                    updated_args[name] = {
-                        "file": value.file,
-                        "filename": value.filename,
-                        "filetype": value.type
-                    }
+                    if isinstance(value.file, StringIO):
+                        updated_args[name] = value.file.getvalue()
+                    else:
+                        updated_args[name] = {
+                            "file": value.file,
+                            "filename": value.filename,
+                            "filetype": value.type
+                        }
                 else:
                     # No data validation performed for non annotated arguments
                     updated_args[name] = value.value
@@ -87,11 +91,14 @@ def validate_parameter(signature, parameter):
                 value = value[0]
                 # The value.file will None if it not a file
                 if value.file:
-                    updated_args[name] = {
-                        "file": value.file,
-                        "filename": value.filename,
-                        "filetype": value.type
-                    }
+                    if isinstance(value.file, StringIO):
+                        updated_args[name] = value.file.getvalue()
+                    else:
+                        updated_args[name] = {
+                            "file": value.file,
+                            "filename": value.filename,
+                            "filetype": value.type
+                        }
                 else:
                     # No data validation performed for non annotated arguments
                     updated_args[name] = value.value

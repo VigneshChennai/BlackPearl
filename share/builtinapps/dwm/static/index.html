@@ -90,7 +90,12 @@
 
                 {{/option_type}}
                 {{^option_type}}
-                    <input id="{{arg}}_input_id" class="form-control" name="{{arg}}" type="{{htmltype}}" placeholder="{{placeholder}}" />
+              	    {{#file_type}}
+                    	<input id="{{arg}}_input_id" name="{{arg}}" type="{{htmltype}}" placeholder="{{placeholder}}" />
+                    {{/file_type}}
+              	    {{^file_type}}
+                    	<input id="{{arg}}_input_id" class="form-control" name="{{arg}}" type="{{htmltype}}" placeholder="{{placeholder}}" />
+                    {{/file_type}}
                 {{/option_type}}
             </div>
         </div>
