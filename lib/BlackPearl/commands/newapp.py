@@ -46,8 +46,7 @@ name : {fullappname}
 # Example : name = "My First BlackPearl Application"
 # Optional: Yes (if not specified: The folder name will be used as application name)
 
-desc : |
-    Add the application description here
+desc : ''
 
 url_prefix : /{appname}
 

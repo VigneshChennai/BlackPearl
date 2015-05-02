@@ -32,3 +32,12 @@ class RequestCannotBeProcessed(Exception):
     """This exception should be raised by a
     preprocessor when a request can't be processed due to some reason"""
     pass
+
+
+class UnSuccessfulException(Exception):
+    """This exception should be raised when an exception has occured yet we have an output to be shared."""
+    def __init__(self, status, desc, data):
+        Exception.__init__(self, desc)
+        self.status = status
+        self.desc = desc
+        self.data = data

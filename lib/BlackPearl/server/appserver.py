@@ -216,7 +216,8 @@ class Uwsgi(ProcessGroup):
                 "buffer-size": '32768',
                 "touch-workers-reload": '%s/uwsgi/%s.reload' % (self.run_loc, webapp.id),
                 "workers": str(multiprocessing.cpu_count()),
-                "lazy-apps": 'true'
+                "lazy-apps": 'true',
+                "log-maxsize": "10485760"
             }
             if virtenv:
                 config['home'] = virtenv

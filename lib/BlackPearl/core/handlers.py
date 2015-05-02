@@ -17,7 +17,7 @@
 
 from BlackPearl.core.decorators import weblocation
 from BlackPearl import application
-from BlackPearl.core.exceptions import RequestInvalid
+from BlackPearl.core.exceptions import RequestInvalid, UnSuccessfulException
 
 
 @weblocation('/__test_run__')
@@ -39,7 +39,11 @@ def run_testset(url, name):
             break
 
     if _testset:
-        return _testset['func'](module['type'])
+        data = _testset['func'](module['type'])
+        status = data["status"]
+        if status != 0:
+            raise UnSuccessfulException(status=status, desc="Testcase execution failed", data=data)
+        return data
     else:
         raise RequestInvalid("The name <%s> not found" % name)
 
@@ -57,11 +61,18 @@ def run_all_testset(url):
         _testsets = webapp.testsets[url]
     except KeyError:
         raise RequestInvalid("No testsets found for url <%s>" % url)
+    failed = False
     for testset in _testsets:
+        data = testset['func'](module['type'])
+        if data["status"] != 0:
+            failed = True
         ret.append({
             "TestSet": testset['name'],
-            "data": testset['func'](module['type'])
+            "data": data
         })
+
+    if failed:
+        raise UnSuccessfulException(status=0, desc="Some of the testset are failed", data=ret)
     return ret
 
 

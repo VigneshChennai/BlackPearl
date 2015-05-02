@@ -1,7 +1,8 @@
 # BlackPearl
 Highly scalable python wsgi application server built on top of uwsgi and nginx.
-The main aim is to build an enterprise grade application server for python webapplications by providing both
-the Webapplication framework and Server component with much focus on scalability.
+The main aim is to build an enterprise grade application server for python
+webapplications by providing both the Webapplication framework and Server
+component with much focus on scalability.
 
 Currently in heavy development.
 BlackPearl is functional and can be used but not ready for realtime.

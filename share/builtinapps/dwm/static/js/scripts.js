@@ -1,30 +1,7 @@
 strings = {
     app_desc_missing : [
-//                        '<div class="alert alert-dismissable alert-info">',
-//                        '<button type="button" class="close" data-dismiss="alert" aria-hidden="true">×</button>',
-                        '<div class="row clearfix">',
-                        '    <div class="col-sm-4 column">',
                         '<strong>The application description missing!</strong>',
-                        '<br/>',
-                        '<br/>',
-                        '<p>Add file __init__.py in the application root directory and provide your ',
-                        '   application description over there as the first statement in the file</p>',
-                        '<br/>',
-                        '<p><strong>Example:</strong> Let the application folder name is "MyApp"',
-                        '<br/>Then in MyApp/__init__.py file, prepend the following lines</p><br/>',
-                        '</div>',
-                        '    <div class="col-sm-6 column"><pre>',
-                        '#!/usr/bin/python',
-                        '',
-                        '#',
-                        '#The license  description',
-                        '#',
-                        '',
-                        '"""Your documentation should go here"""',
-                        '</pre>',
-                        '    </div>',
-                        '</div>'//,
-//                        '</div>'
+                        'You can add the same in the config.yaml file of this webapp '
                         ].join('\n'),
 
     module_desc_missing : [
@@ -66,6 +43,10 @@ var _applications = [];
 var _current_module = null;
 var _current_app_id = 0;
 var _current_module_type = null;
+
+function getCurrentWebAppURL() {
+    return _applications[_current_app_id].url_prefix;
+}
 
 function load() {
     var future = initialize_applications();
@@ -128,10 +109,14 @@ function load_description(id) {
     var desc_tmpl = $("#applications-desc-tmpl").html();
     if(_applications[id].description) {
         var rendered = Mustache.render(desc_tmpl, {"desc" :
-                                        _applications[id].description});
+                                        _applications[id].description,
+                                        "url": getCurrentWebAppURL()});
         $("#application-details").html(rendered);
     } else {
-        $("#application-details").html(strings.app_desc_missing);
+        var rendered = Mustache.render(desc_tmpl, {"desc" :
+                                        strings.app_desc_missing,
+                                        "url": getCurrentWebAppURL()});
+        $("#application-details").html(rendered);
     }
 
     $("#handlers-count").html(_applications[id].handlers.length);

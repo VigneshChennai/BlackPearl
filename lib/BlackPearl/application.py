@@ -27,7 +27,7 @@ from BlackPearl import testing
 from BlackPearl.core import sessions
 from BlackPearl.core import exceptions
 from BlackPearl.core import utils
-from BlackPearl.core.exceptions import RequestInvalid
+from BlackPearl.core.exceptions import RequestInvalid, UnSuccessfulException
 
 
 webapp = None
@@ -178,10 +178,19 @@ def __application__(environ, start_response):
                         for i in return_to_client(start_response=start_response, headers=headers,
                                                   session=session, data=rets):
                             yield i
+                    except UnSuccessfulException as e:
+                        rets = {
+                            "status": -203,
+                            "desc": e.desc,
+                            "data": e.data
+                        }
+                        for i in return_to_client(start_response=start_response, headers=headers,
+                                                  session=session, data=rets):
+                            yield i
                     except Exception:
                         error = traceback.format_exc()
                         rets = {
-                            "status": -203,
+                            "status": -299,
                             "desc": error
                         }
                         for i in return_to_client(start_response=start_response, headers=headers,

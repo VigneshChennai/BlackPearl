@@ -20,4 +20,3 @@ import BlackPearl.application
 BlackPearl.application.initialize()
 application = BlackPearl.application.application
 
- 
