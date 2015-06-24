@@ -193,12 +193,7 @@ class Uwsgi(ProcessGroup):
             )
 
     def generate_conf_file(self):
-        try:
-            virtenv = os.environ['VIRTUAL_ENV']
-            print("INFO: Using python at <%s> for uwsgi service" % virtenv)
-        except:
-            print("INFO: Using system installed python for uwsgi service")
-            virtenv = None
+        print("INFO: Using python at <%s> for uwsgi service" % sys.executable)
 
         opt = {}
         for key, value in self.uwsgi_options.items():
@@ -208,19 +203,12 @@ class Uwsgi(ProcessGroup):
             opt[key] = value
 
         for webapp in self.webapps_list:
-            config = {
-                "socket": webapp.socket,
-                "wsgi-file": self.uwsgi_file,
-                "logto": '%s/uwsgi/%s.log' % (self.logs_dir, webapp.id),
-                "pidfile": '%s/uwsgi/%s.pid' % (self.run_loc, webapp.id),
-                "buffer-size": '32768',
-                "touch-workers-reload": '%s/uwsgi/%s.reload' % (self.run_loc, webapp.id),
-                "workers": str(multiprocessing.cpu_count()),
-                "lazy-apps": 'true',
-                "log-maxsize": "10485760"
-            }
-            if virtenv:
-                config['home'] = virtenv
+            config = {"socket": webapp.socket, "wsgi-file": self.uwsgi_file,
+                      "logto": '%s/uwsgi/%s.log' % (self.logs_dir, webapp.id),
+                      "pidfile": '%s/uwsgi/%s.pid' % (self.run_loc, webapp.id), "buffer-size": '32768',
+                      "touch-workers-reload": '%s/uwsgi/%s.reload' % (self.run_loc, webapp.id),
+                      "workers": str(multiprocessing.cpu_count()), "lazy-apps": 'true', "log-maxsize": "10485760",
+                      'home': sys.exec_prefix}
 
             config.update(opt)
             conf_list = [str(key) + " = " + str(value) for key, value in config.items()]
