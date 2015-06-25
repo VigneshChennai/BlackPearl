@@ -185,7 +185,7 @@ class Uwsgi(ProcessGroup):
                     "BLACKPEARL_LISTEN": str(self.nginx_bind),
                     "PYTHONPATH": ":".join(
                         [self.pypath,
-                         os.path.join(webapp.location, "src"),
+                         os.path.join(webapp.location, "src/api"),
                          os.path.join(webapp.location, "lib"),
                          os.path.join(webapp.location, 'test')]
                     )
@@ -255,22 +255,22 @@ class Nginx(Process):
             location = Location()
             if len(webapp.url_prefix) > 1:
                 location.path = '%s/(.+\..+)' % webapp.url_prefix
-                location.add_value('alias', '%s/static/$1' % (
+                location.add_value('alias', '%s/src/static/$1' % (
                     webapp.location))
                 locations.append(location)
                 location = Location()
                 location.path = '%s(.*/$)' % webapp.url_prefix
-                location.add_value('alias', '%s/static$1' % (
+                location.add_value('alias', '%s/src/static$1' % (
                     webapp.location))
                 locations.append(location)
             else:
                 location.path = '/(.+\..+)'
-                location.add_value('alias', '%s/static/$1' % (
+                location.add_value('alias', '%s/src/static/$1' % (
                     webapp.location))
                 root_location.append(location)
                 location = Location()
                 location.path = '(/$)'
-                location.add_value('alias', '%s/static$1' % (
+                location.add_value('alias', '%s/src/static$1' % (
                     webapp.location))
                 root_location.append(location)
 
@@ -389,7 +389,7 @@ class AppServer(AsyncTask, ProcessStatus):
     def _code_update_monitor_init(self):
         print("INFO: Watching <%s> paths for file modifications." % str(self.webapp_locations))
         paths = self.webapp_locations
-        excl = pyinotify.ExcludeFilter([al + "/*/static" for al in self.webapp_locations])
+        excl = pyinotify.ExcludeFilter([al + "/*/src/static" for al in self.webapp_locations])
         self.afm = fileutils.AsyncFileMonitor(self._code_update_cb, loop=self.ev_loop)
         self.afm.set_watch_path(paths, rec=True, exclude_filter=excl)
 

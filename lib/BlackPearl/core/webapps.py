@@ -303,7 +303,7 @@ def analyze(location, webapp_folder):
         print("WARNING: Webapps folder<%s> not found. Ignoring.. " % location)
         return
 
-    for l in (os.path.join(location, webapp_folder, "src"),
+    for l in (os.path.join(location, webapp_folder, "src/api"),
               os.path.join(location, webapp_folder, "lib"),
               os.path.join(location, webapp_folder, 'test')):
         print("INFO: Adding <%s> to python path." % l)
