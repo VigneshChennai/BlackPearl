@@ -65,7 +65,7 @@ handlers :
 
 # Description: Handlers are the list of python modules which holds the blackpearl web modules.
 #
-# Example : if python file is (Webapp_folder/src/handlers.py and in Webapp_folder/src/security/handlers.py) then
+# Example : if python file is (Webapp_folder/src/api/handlers.py and in Webapp_folder/src/api/security/handlers.py) then
 #           handlers :
 #                - handler
 #                - security.handlers
@@ -92,7 +92,7 @@ preprocessors : []
 
 # Description: List of python function which need to process the incoming request before handing it to the web modules.
 # Example : if preprocessor python functions (ie. functions decorated with @preprocessor decorator)
-#           "access_check" and "unique_user_count" defined under Webapp_folder/src/preprocessors.py file then
+#           "access_check" and "unique_user_count" defined under Webapp_folder/src/api/preprocessors.py file then
 #
 #           preprocessors :
 #                  - preprocessors.access_check
@@ -107,7 +107,7 @@ posthandlers : []
 
 # Description: List of python function which need to process the outgoing data after the web module handled the request.
 # Example : if posthandler python functions (ie. functions decorated with @posthandler decorator)
-#           "data_validation_filter" and "data_formatting" defined under Webapp_folder/src/posthandlers.py file then
+#           "data_validation_filter" and "data_formatting" defined under Webapp_folder/src/api/posthandlers.py file then
 #
 #           preprocessors :
 #                  - posthandlers.data_validation_filter
@@ -167,8 +167,9 @@ def invoke(**args):
     os.mkdir(app_name)
     os.mkdir(os.path.join(app_name, "lib"))
     os.mkdir(os.path.join(app_name, "src"))
+    os.mkdir(os.path.join(app_name, "src/api"))
+    os.mkdir(os.path.join(app_name, "src/static"))
     os.mkdir(os.path.join(app_name, "test"))
-    os.mkdir(os.path.join(app_name, "static"))
 
     with open(os.path.join(app_name, 'config.yaml'), "w") as f:
         f.write(config_file.format(appname=app_name,
@@ -177,5 +178,5 @@ def invoke(**args):
                                    website=website,
                                    emailid=email_id))
 
-    with open(os.path.join(app_name, "src", 'handlers.py'), "w") as f:
+    with open(os.path.join(app_name, "src/api", 'handlers.py'), "w") as f:
         f.write(handlers_file)

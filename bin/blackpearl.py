@@ -424,7 +424,7 @@ if __name__ == "__main__":
             try:
                 print("INFO: Creating new webapp...")
                 args_copy = p_args.copy()
-                from BlackPearl.commands.newapp import invoke
+                from BlackPearl.tools.newapp import invoke
                 invoke(**args_copy)
             except:
                 print("SEVERE: Error occurred while creating new webapp.")
