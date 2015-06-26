@@ -369,7 +369,7 @@ if __name__ == "__main__":
     try:
         apr = ArgumentParserRules(
             with_arguments=['-c', 'newapp'],
-            without_arguments=['startup', 'shutdown'],
+            without_arguments=['startup', 'shutdown', '-d', '--daemon'],
             should_not_be_with={
                 'startup': ['shutdown'],
                 'shutdown': ['startup'],
@@ -416,8 +416,9 @@ if __name__ == "__main__":
             print(startup_notes)
             print(Color.BOLD + 'Author' + Color.END)
             print(author)
+            daemon = True if '-d' in p_args or '--daemon' in p_args else False
 
-            start_server(daemon=True, config=configuration)
+            start_server(daemon=daemon, config=configuration)
         elif "shutdown" in p_args:
             stop_server(config=configuration)
         elif "newapp" in p_args:
