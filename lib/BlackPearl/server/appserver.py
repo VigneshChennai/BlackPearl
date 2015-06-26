@@ -248,31 +248,41 @@ class Nginx(Process):
                 self.path = None
                 self.values = []
 
-            def add_value(self, key, value):
+            def add_value(self, key, *value):
                 self.values.append([key, value])
 
         for webapp in webapps_list:
             location = Location()
             if len(webapp.url_prefix) > 1:
-                location.path = '%s/(.+\..+)' % webapp.url_prefix
-                location.add_value('alias', '%s/src/static/$1' % (
-                    webapp.location))
+                location.path = '^%s/?$' % webapp.url_prefix
+                location.add_value('alias', '%s/src/static/' % (webapp.location))
+                location.add_value('try_files', 'index.html', '%s/index' % webapp.url_prefix)
                 locations.append(location)
                 location = Location()
-                location.path = '%s(.*/$)' % webapp.url_prefix
-                location.add_value('alias', '%s/src/static$1' % (
-                    webapp.location))
+                location.path = '(^%s/(.+))/$' % webapp.url_prefix
+                location.add_value('alias', '%s/src/static/$2/' % (webapp.location))
+                location.add_value('try_files', 'index.html', '$1/index')
+                locations.append(location)
+
+                location = Location()
+                location.path = '^%s/(.+\.[^/]+$)' % webapp.url_prefix
+                location.add_value('alias', '%s/src/static/$1' % (webapp.location))
                 locations.append(location)
             else:
-                location.path = '/(.+\..+)'
-                location.add_value('alias', '%s/src/static/$1' % (
-                    webapp.location))
-                root_location.append(location)
+                location.path = '^/?$'
+                location.add_value('alias', '%s/src/static/' % (webapp.location))
+                location.add_value('try_files', 'index.html', '/index')
+                locations.append(location)
                 location = Location()
-                location.path = '(/$)'
-                location.add_value('alias', '%s/src/static$1' % (
-                    webapp.location))
-                root_location.append(location)
+                location.path = '(^/(.+))/$'
+                location.add_value('alias', '%s/src/static/$2/' % (webapp.location))
+                location.add_value('try_files', 'index.html', '$1/index')
+                locations.append(location)
+
+                location = Location()
+                location.path = '^/(.+\.[^/]+$)'
+                location.add_value('alias', '%s/src/static/$1' % (webapp.location))
+                locations.append(location)
 
         conf = "\n pid  %s/nginx/nginx.pid;" % self.run_loc
         conf += "\n daemon off;"
@@ -305,13 +315,13 @@ class Nginx(Process):
         for loc in locations:
             conf += "\n\n\t\t location ~ %s {" % loc.path
             for val in loc.values:
-                conf += "\n\t\t\t %s '%s';" % (val[0], val[1])
+                conf += "\n\t\t\t %s '%s';" % (val[0], "' '".join(val[1]))
             conf += "\n\t\t }"
 
         for loc in root_location:
             conf += "\n\n\t\t location ~ %s {" % loc.path
             for val in loc.values:
-                conf += "\n\t\t\t %s '%s';" % (val[0], val[1])
+                conf += "\n\t\t\t %s '%s';" % (val[0], "' '".join(val[1]))
             conf += "\n\t\t }"
 
         for webapp in webapps_list:

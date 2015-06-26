@@ -18,6 +18,9 @@
 from BlackPearl.core import datatype
 from BlackPearl.core.decorators import weblocation, webname
 
+@weblocation("/index")
+def index():
+    return "The testing app doesn't have a web page. Try accessing it from Deployed modules webapp."
 
 @weblocation("/servertesting")
 class Session:

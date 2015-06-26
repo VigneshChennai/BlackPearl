@@ -149,13 +149,14 @@ class Webapp:
             self.session_enabled = None
 
         try:
-            if len(self.url_prefix) == 0:
+            config.url_prefix = config.url_prefix.strip()
+            if len(config.url_prefix) == 0:
                 print("WARNING: Webapp<%s> - Empty url_prefix is set in the"
                       " configuration file" % self.name)
                 print("WARNING: Using folder name </%s> as url_prefix for this webapp." % self.folder_name)
-                self.url_prefix = self.folder_name
+                self.url_prefix = '/' + self.folder_name
             else:
-                if self.url_prefix.startswith('/'):
+                if config.url_prefix.startswith('/'):
                     self.url_prefix = config.url_prefix
                 else:
                     print("WARNING: url_prefix is not defined with '/' in the "
@@ -166,6 +167,8 @@ class Webapp:
         except AttributeError:
             self.url_prefix = "/" + self.folder_name
 
+        if len(self.url_prefix) > 1 and self.url_prefix[-1] == "/":
+            self.url_prefix = self.url_prefix[:-1]
         self.id = self.url_prefix[1:].replace("/","_")
 
         print("INFO: URL prefix <%s>" % self.url_prefix)
@@ -221,7 +224,7 @@ class Webapp:
             except:
                 pass
             else:
-                if len(self.url_prefix) == 0:
+                if len(self.url_prefix) == 1:
                     webmodule = testset['webmodule']
                     try:
                         self.testsets[webmodule].append(testset)
@@ -251,7 +254,7 @@ class Webapp:
         for name, member in inspect.getmembers(module):
             if isfunction(member):
                 if hasattr(member, "__webmodule__"):
-                    if len(self.url_prefix) == 0:
+                    if len(self.url_prefix) == 1:
                         url = utils.fixurl(member.__webmodule__['url'])
                         if self._check_url(url, name, member):
                             self.webmodules[url] = member.__webmodule__
@@ -277,7 +280,7 @@ class Webapp:
                               % (self.name, member.__posthandler__['name']))
             elif isclass(member) and hasattr(member, "__webmodules__"):
                 for webmodule in member.__webmodules__:
-                    if len(self.url_prefix) == 0:
+                    if len(self.url_prefix) == 1:
                         url = utils.fixurl(webmodule['url'])
                         if self._check_url(url, name, member):
                             self.webmodules[url] = webmodule

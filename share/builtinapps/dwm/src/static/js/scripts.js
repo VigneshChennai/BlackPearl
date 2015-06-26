@@ -67,6 +67,11 @@ function initialize_applications() {
         var status = data.status;
         if(status == 0) {
             _applications = data.data;
+            for(var i = 0; i < _applications[0].url_prefix.length; i++) {
+                if (_applications[i].url_prefix.length == 1) {
+                   _applications[i].url_prefix = ""
+                }
+            }
             $.getJSON(_applications[0].url_prefix + "/__application__", function (data){
                 var status = data.status;
                 if(status == 0) {
