@@ -1,4 +1,9 @@
-
+a {
+outline: 0;
+}
+a:focus {
+outline: 0;
+}
 
 .panel-heading a {
     font-weight:bold;
