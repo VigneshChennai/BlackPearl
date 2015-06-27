@@ -169,7 +169,11 @@ class Webapp:
 
         if len(self.url_prefix) > 1 and self.url_prefix[-1] == "/":
             self.url_prefix = self.url_prefix[:-1]
-        self.id = self.url_prefix[1:].replace("/","_")
+
+        if len(self.url_prefix) == 1:
+            self.id = "__ROOT__"
+        else:
+            self.id = self.url_prefix[1:].replace("/","_")
 
         print("INFO: URL prefix <%s>" % self.url_prefix)
 
