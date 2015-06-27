@@ -28,7 +28,7 @@ logger = Logger(Logger.DEBUG)
 logger.initialize()
 
 
-for package in ('PyYaml', 'pycrypto'):
+for package in ('PyYaml', 'pycrypto', 'requests'):
     if pip.main(['install', package]) == 1:
         print("ERROR: Failed to install package<%s> in the new virtualenv." % package)
         sys.exit(1)

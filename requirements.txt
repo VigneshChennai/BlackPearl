@@ -1,5 +1,4 @@
 pycrypto==2.6.1
 pyinotify==0.9.5
 PyYAML==3.11
-requests==2.6.0
 virtualenv==13.0.3
