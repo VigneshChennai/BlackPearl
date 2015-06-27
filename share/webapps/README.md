@@ -10,24 +10,30 @@
 	    :-->App1 (Folder name of the webapp)
 	    :     :
 	    :     :--> src
-	    :     :
-	    :     :--> lib
+	    :     :     :-->api
+	    :     :     :
+	    :     :     :-->lib
+	    :     :     :
+	    :     :     :-->static
+	    :     :     :  
+	    :     :     :-->dynamic
 	    :     :
 	    :     :--> test
-	    :     :
-	    :     :--> static
 	    :     :
 	    :     :--> config.yaml
 	    :
 	    :-->App2 (Folder name of the webapp)
 	    :     :
 	    :     :--> src
-	    :     :
-	    :     :--> lib
+	    :     :     :-->api
+	    :     :     :
+	    :     :     :-->lib
+	    :     :     :
+	    :     :     :-->static
+	    :     :     :  
+	    :     :     :-->dynamic
 	    :     :
 	    :     :--> test
-	    :     :
-	    :     :--> static
 	    :     :
 	    :     :--> config.yaml
 	    :
@@ -63,7 +69,7 @@
     
     Example :
     
-        if python file is (Webapp_folder/src/handlers.py and in Webapp_folder/src/security/handlers.py) then
+        if python file is (Webapp_folder/src/api/handlers.py and in Webapp_folder/src/api/security/handlers.py) then
         handlers :
            - handler
            - security.handlers
@@ -91,7 +97,7 @@
 
     Description: List of python function which need to process the incoming request before handing it to the web modules.
     Example : if preprocessor python functions (ie. functions decorated with @preprocessor decorator)
-              "access_check" and "unique_user_count" defined under Webapp_folder/src/preprocessors.py file then
+              "access_check" and "unique_user_count" defined under Webapp_folder/src/api/preprocessors.py file then
     
               preprocessors :
                      - preprocessors.access_check
@@ -106,7 +112,7 @@
 
     Description: List of python function which need to process the outgoing data after the web module handled the request.
     Example : if posthandler python functions (ie. functions decorated with @posthandler decorator)
-              "data_validation_filter" and "data_formatting" defined under Webapp_folder/src/posthandlers.py file then
+              "data_validation_filter" and "data_formatting" defined under Webapp_folder/src/api/posthandlers.py file then
     
               preprocessors :
                      - posthandlers.data_validation_filter
