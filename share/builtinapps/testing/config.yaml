@@ -17,7 +17,7 @@ name : Server Testing
 
 desc : ""
 
-url_prefix : /sts
+url_prefix : /server_testing
 
 # Description: URL Prefix for the web application.
 # Example : url_prefix = "/reservation"

@@ -215,7 +215,11 @@ def start_server(daemon, config):
     os.mkdir(path['run'])
     os.mkdir(os.path.join(path['run'], 'uwsgi'))
     os.mkdir(os.path.join(path['run'], 'nginx'))
-    os.mkdir(os.path.join(os.path.join(path['run'], 'uwsgi'), 'pickle'))
+    os.mkdir(os.path.join(path['run'], 'uwsgi', 'pickle'))
+
+    if not os.access(os.path.join(path['cache'], "virtenv"), os.F_OK):
+        os.makedirs(os.path.join(path['cache'], "virtenv"))
+
     if not os.access(path['log'], os.F_OK):
         os.makedirs(path['log'])
     if not os.access(os.path.join(path['log'], "uwsgi"), os.F_OK):

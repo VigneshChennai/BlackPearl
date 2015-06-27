@@ -22,6 +22,7 @@ path :
         - /usr/share/blackpearl/webapps
     run : /run/blackpearl
     log : /var/log/blackpearl
+    cache : /var/cache
 
 server:
     nginx : /usr/sbin/nginx
