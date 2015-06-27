@@ -29,4 +29,3 @@ def applications():
     # Sorting by webapp name
     ret.sort(key=lambda t: t["name"])
     return ret
-

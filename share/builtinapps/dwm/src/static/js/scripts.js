@@ -67,7 +67,7 @@ function initialize_applications() {
         var status = data.status;
         if(status == 0) {
             _applications = data.data;
-            for(var i = 0; i < _applications[0].url_prefix.length; i++) {
+            for(var i = 0; i < _applications.length; i++) {
                 if (_applications[i].url_prefix.length == 1) {
                    _applications[i].url_prefix = ""
                 }
