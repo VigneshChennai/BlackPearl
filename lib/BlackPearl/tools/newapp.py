@@ -169,6 +169,7 @@ def invoke(**args):
     os.mkdir(os.path.join(app_name, "src"))
     os.mkdir(os.path.join(app_name, "src/api"))
     os.mkdir(os.path.join(app_name, "src/static"))
+    os.mkdir(os.path.join(app_name, "src/dynamic"))
     os.mkdir(os.path.join(app_name, "test"))
 
     with open(os.path.join(app_name, 'config.yaml'), "w") as f:
