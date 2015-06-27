@@ -22,6 +22,7 @@ path :
         - share/webapps
     run : run
     log : var/log
+    cache : var/cache
 
 server:
     nginx : /usr/sbin/nginx

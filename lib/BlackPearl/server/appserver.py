@@ -21,6 +21,8 @@ import signal
 import asyncio
 import multiprocessing
 import pickle
+import virtualenv
+
 from enum import Enum
 
 import os
@@ -34,73 +36,56 @@ from BlackPearl.server.core.logger import Logger
 from BlackPearl.core import webapps as webapps
 
 
-class WebAppMinimal:
-    """WebAppMinimal will hold a minimal information about the webapp which are required for preparing the run
-    environment for the webapp."""
-    def __init__(self, webapp, pickle_file):
-        self.id = webapp.id
-        self.name = webapp.name
-        self.location = webapp.location
-        self.pickle_file = pickle_file
-        self.url_prefix = webapp.url_prefix
-
-    def __repr__(self):
-        return repr({
-            "webapp": self.name,
-            "url_prefix": self.url_prefix,
-            "location": self.location
-        })
-
-
-def analyse_and_pickle_webapps(pickle_folder, *app_dirs):
-
-    # Analyses the single webapp folder
-    def analyser(location, folder, queue):
-        try:
-            print("INFO: Analysing webapp <%s> ...." % folder)
-            # Analysing the webapp folder and returning the analysis result
-            webapp = webapps.analyze(location, folder)
-            print("INFO: Webapp analysing completed.")
-            print("INFO: Webapp details : %s" % webapp)
-
-            # Pickling the webapp information
-            f = os.path.join(pickle_folder, webapp.id + ".pickle")
-            print("INFO: Writing analysed information to file <%s>." % f)
-            with open(f, "wb") as pickle_file:
-                pickle.dump(webapp, pickle_file)
-            print("INFO: Write completed")
-
-            # Returning only the minimal information to main process to prevent any webapp module getting imported to
-            # the main process
-            queue.put(WebAppMinimal(webapp, f))
-        except:
-            print("ERROR: Fatal error during analysing webapps.")
-            print("ERROR: %s" % traceback.format_exc())
-            # Returning None on failure
-            queue.put(None)
-
+@asyncio.coroutine
+def analyse_and_pickle_webapps(pypath, virtenv_folder, pickle_folder, *app_dirs):
     # Will be used to hold the list of webapp analysis result
-    analyse_result_list = []
     print("INFO: Analysing deployed webapps ....")
 
+    webapps_minimal_file = os.path.join(pickle_folder, "webapps.pickle.minimal")
     # Looping over the webapp deployment folders
     for app_dir in app_dirs:
         print("INFO: Initializing webapps located at <%s>" % app_dir)
 
+        count = 0
         # Looping over the webapp folders deployed in a deployment folder
         for webapp_folder in webapps.get_webapp_folders(app_dir):
-            q = multiprocessing.Queue()
+            count += 1
+            webapp_virtenv = os.path.join(virtenv_folder, webapp_folder + "_path_" + str(count))
+            if not os.access(webapp_virtenv, os.F_OK):
+                print("INFO: Creating the virtual environment at <%s>. This till take some time." % webapp_virtenv)
+                virtualenv.create_environment(webapp_virtenv)
+                print("INFO: The virtual environment completed successfully.")
+            else:
+                print("INFO: Using the virtual environment at <%s>" % webapp_virtenv)
             # Running the analysing working in a separate process to avoid webapp modules getting imported to main
             # process
-            p = multiprocessing.Process(target=analyser, args=(app_dir, webapp_folder, q))
-            p.start()
 
-            # Getting the output of analysis
-            ret = q.get()
-            if ret:
-                analyse_result_list.append(ret)
-            p.join()
+            command = [os.path.join(webapp_virtenv, "bin/python"),
+                       os.path.join(os.path.dirname(__file__), 'analyzer.py'), webapps_minimal_file,
+                       pickle_folder, app_dir, webapp_folder]
+            p = Process("Process: Webapp <%s> initializer" % app_dir, command, env={
+                "PYTHONPATH": ":".join(
+                    [pypath,
+                     os.path.join(app_dir, webapp_folder, "src", "api"),
+                     os.path.join(app_dir, webapp_folder, "lib"),
+                     os.path.join(app_dir, webapp_folder, 'test')]
+                )
+            })
+
+            yield from p.start()
+            yield from p.wait_for_completion()
+            if p.status == process.Status.STOPPED:
+                print("INFO: Webapp<%s> analyse completed successfully." % app_dir)
+            else:
+                print("ERROR: Webapp<%s> analyse failed." % app_dir)
+
         print("INFO: Webapps deployed at <%s> initialized" % app_dir)
+
+    if os.access(webapps_minimal_file, os.F_OK):
+        with open(webapps_minimal_file, "rb") as rb:
+            analyse_result_list = pickle.load(rb)
+    else:
+        analyse_result_list = []
 
     print("INFO: List of initialized webapps : %s" % analyse_result_list)
 
@@ -109,7 +94,7 @@ def analyse_and_pickle_webapps(pickle_folder, *app_dirs):
     print("INFO: Writing deployed apps information to file <%s>." % da_file)
     data = []
     for ret in analyse_result_list:
-        data.append({"name" : ret.name, "url_prefix" : ret.url_prefix})
+        data.append({"name": ret.name, "url_prefix": ret.url_prefix})
     with open(da_file, "wb") as da_file:
         pickle.dump(data, da_file)
 
@@ -129,7 +114,6 @@ def precheck():
 
 
 class Uwsgi(ProcessGroup):
-
     # List of options which can not be overriding from configuration file.
     __immutable_options__ = [
         'socket', 'wsgi-file', 'log-to', 'pidfile', 'touch-workers-reload', 'lazy-apps'
@@ -176,7 +160,7 @@ class Uwsgi(ProcessGroup):
             print("DEBUG: Starting uWsgi Service for <", webapp.name, "(", webapp.url_prefix, ") > webapp")
             command = [self.uwsgi_loc, '--ini', "%s/uwsgi/%s.conf" % (self.run_loc, webapp.id)]
             self.add_process(
-                name="'%s' uWsgi Service" %webapp.id, command=command,
+                name="'%s' uWsgi Service" % webapp.id, command=command,
                 env={
                     "BLACKPEARL_DEPLOYED_APPS_PICKLE": "%s/uwsgi/pickle/deployed_apps.pickle" % self.run_loc,
                     "BLACKPEARL_PICKLE_FILE": webapp.pickle_file,
@@ -185,7 +169,7 @@ class Uwsgi(ProcessGroup):
                     "BLACKPEARL_LISTEN": str(self.nginx_bind),
                     "PYTHONPATH": ":".join(
                         [self.pypath,
-                         os.path.join(webapp.location, "src/api"),
+                         os.path.join(webapp.location, "src", "api"),
                          os.path.join(webapp.location, "lib"),
                          os.path.join(webapp.location, 'test')]
                     )
@@ -193,7 +177,6 @@ class Uwsgi(ProcessGroup):
             )
 
     def generate_conf_file(self):
-        print("INFO: Using python at <%s> for uwsgi service" % sys.executable)
 
         opt = {}
         for key, value in self.uwsgi_options.items():
@@ -203,12 +186,13 @@ class Uwsgi(ProcessGroup):
             opt[key] = value
 
         for webapp in self.webapps_list:
+            print("INFO: Using python at <%s> for webapp<%s>" % (webapp.python_path, webapp.name))
             config = {"socket": webapp.socket, "wsgi-file": self.uwsgi_file,
                       "logto": '%s/uwsgi/%s.log' % (self.logs_dir, webapp.id),
                       "pidfile": '%s/uwsgi/%s.pid' % (self.run_loc, webapp.id), "buffer-size": '32768',
                       "touch-workers-reload": '%s/uwsgi/%s.reload' % (self.run_loc, webapp.id),
                       "workers": str(multiprocessing.cpu_count()), "lazy-apps": 'true', "log-maxsize": "10485760",
-                      'home': sys.exec_prefix}
+                      'home': webapp.python_home_path}
 
             config.update(opt)
             conf_list = [str(key) + " = " + str(value) for key, value in config.items()]
@@ -340,61 +324,71 @@ Status = Enum("Status", "NOTSTARTED, STARTING, STARTFAILED, STARTED, STOPPING, R
 
 
 class AppServer(AsyncTask, ProcessStatus):
-
     # Instance Variables : config, status, reloading_code, reloading_conf,
     #                      webapp_locations, ev_loop, uwsgi, nginx
-    def __init__(self, config):
+
+    def __init__(self):
         AsyncTask.__init__(self)
         ProcessStatus.__init__(self, process_name="BlackPearl Server")
+        self.environment_initialized = False
 
-        path = config['path']
-        server = config['server']
-        hostname = config['hostname']
-        listen = config['listen']
-        security = config['security']
-        uwsgi_options = config['uwsgi_options']
+    @asyncio.coroutine
+    def initialize_environment(self, config):
+        try:
+            path = config['path']
+            server = config['server']
+            hostname = config['hostname']
+            listen = config['listen']
+            security = config['security']
+            uwsgi_options = config['uwsgi_options']
 
-        self.config = config
-        self.reloading_code = False
-        self.reloading_conf = False
-        self.modified_files = []
+            self.config = config
+            self.reloading_code = False
+            self.reloading_conf = False
+            self.modified_files = []
 
-        webapp_locations = path['webapps']
+            webapp_locations = path['webapps']
+            self.webapp_locations = webapp_locations
 
-        webapps_list = analyse_and_pickle_webapps(
-            "%s/uwsgi/pickle/" % path['run'],
-            *webapp_locations
-        )
+            webapps_list = yield from analyse_and_pickle_webapps(path['lib'],
+                                                                 os.path.join(config['path']['cache'], "virtenv"),
+                                                                 "%s/uwsgi/pickle/" % path['run'],
+                                                                 *webapp_locations
+                                                                 )
 
-        if not webapps_list:
-            print("SEVERE: No application deployed.")
-            raise NoApplicationDeployedError("No application deployed")
+            if not webapps_list:
+                print("SEVERE: No application deployed.")
+                raise NoApplicationDeployedError("No application deployed")
 
-        for webapp in webapps_list:
-            webapp.socket = path['run'] + "/uwsgi/%s.socket" % webapp.id
+            for webapp in webapps_list:
+                webapp.socket = path['run'] + "/uwsgi/%s.socket" % webapp.id
 
-        self.webapp_locations = webapp_locations
+            # Asyncio the event loop
+            self.ev_loop = asyncio.get_event_loop()
 
-        # Asyncio the event loop
-        self.ev_loop = asyncio.get_event_loop()
+            self.uwsgi = Uwsgi(
+                server['uwsgi'], path['lib'] + "/wsgi.py", webapps_list,
+                path['log'], path['run'], security['key'],
+                security['block_size'], listen,
+                path['lib'], uwsgi_options
+            )
+            self.uwsgi.generate_conf_file()
 
-        self.uwsgi = Uwsgi(
-            server['uwsgi'], path['lib'] + "/wsgi.py", webapps_list,
-            path['log'], path['run'], security['key'],
-            security['block_size'], listen,
-            path['lib'], uwsgi_options
-        )
-        self.uwsgi.generate_conf_file()
+            self.nginx = Nginx(
+                server['nginx'], hostname, listen,
+                path['run'], path['share'], path['log']
+            )
+            self.nginx.generate_conf_file(webapps_list)
 
-        self.nginx = Nginx(
-            server['nginx'], hostname, listen,
-            path['run'], path['share'], path['log']
-        )
-        self.nginx.generate_conf_file(webapps_list)
+            # Defining service status change listener
+            self.nginx.add_status_listener(functools.partial(self._service_status_update_cb, "nginx "))
+            self.uwsgi.add_status_listener(functools.partial(self._service_status_update_cb, "uwsgi"))
 
-        # Defining service status change listener
-        self.nginx.add_status_listener(functools.partial(self._service_status_update_cb, "nginx "))
-        self.uwsgi.add_status_listener(functools.partial(self._service_status_update_cb, "uwsgi"))
+        except:
+            print("EROOR: Failed to initialize the environment.")
+            print("ERROR: %s" % traceback.format_exc())
+        else:
+            self.environment_initialized = True
 
     def _code_update_monitor_init(self):
         print("INFO: Watching <%s> paths for file modifications." % str(self.webapp_locations))
@@ -505,7 +499,8 @@ class AppServer(AsyncTask, ProcessStatus):
             self.reloading_code = True
             yield from asyncio.sleep(2)
             if self.__status__ == Status.STARTED:
-                webapps_list = analyse_and_pickle_webapps(
+                webapps_list = yield from analyse_and_pickle_webapps(
+                    self.config['path']['lib'], os.path.join(self.config['path']['cache'], "virtenv"),
                     "%s/uwsgi/pickle/" % self.config['path']['run'],
                     *self.webapp_locations
                 )
@@ -666,19 +661,27 @@ def start(config, daemon=False):
             f.write(str(os.getpid()))
 
         ev_loop = asyncio.get_event_loop()
-        app_server = AppServer(config)
-        # Creates the event loop and will wait till the server stops
+        app_server = AppServer()
 
-        start_task = asyncio.async(app_server.start())
+        initialize_task = asyncio.async(app_server.initialize_environment(config))
 
         # Waits till server starts
-        ev_loop.run_until_complete(start_task)
-        print("INFO: BlackPearl services started.")
+        ev_loop.run_until_complete(initialize_task)
 
-        try:
-            # Waiting for server to shutdown
-            ev_loop.run_until_complete(app_server.wait_for_completion())
-        finally:
+        if app_server.environment_initialized:
+            start_task = asyncio.async(app_server.start())
+
+            # Waits till server starts
+            ev_loop.run_until_complete(start_task)
+            print("INFO: BlackPearl services started.")
+
+            try:
+                # Waiting for server to shutdown
+                ev_loop.run_until_complete(app_server.wait_for_completion())
+            finally:
+                ev_loop.close()
+        else:
+            print("ERROR: BlackPearl services not started due to the issue occurred during environment initialization.")
             ev_loop.close()
 
 

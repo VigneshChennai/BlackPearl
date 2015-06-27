@@ -25,6 +25,25 @@ import yaml
 from . import utils
 
 
+class WebAppMinimal:
+    """WebAppMinimal will hold a minimal information about the webapp which are required for preparing the run
+    environment for the webapp."""
+    def __init__(self, webapp, pickle_file):
+        self.id = webapp.id
+        self.name = webapp.name
+        self.location = webapp.location
+        self.pickle_file = pickle_file
+        self.url_prefix = webapp.url_prefix
+        self.python_home_path = None
+        self.python_path = None
+
+    def __repr__(self):
+        return repr({
+            "webapp": self.name,
+            "url_prefix": self.url_prefix,
+            "location": self.location
+        })
+
 class Webapp:
     """This class holds all the values corresponding to a web application"""
 
@@ -310,7 +329,7 @@ def analyze(location, webapp_folder):
         print("WARNING: Webapps folder<%s> not found. Ignoring.. " % location)
         return
 
-    for l in (os.path.join(location, webapp_folder, "src/api"),
+    for l in (os.path.join(location, webapp_folder, "src", "api"),
               os.path.join(location, webapp_folder, "lib"),
               os.path.join(location, webapp_folder, 'test')):
         print("INFO: Adding <%s> to python path." % l)

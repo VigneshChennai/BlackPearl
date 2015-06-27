@@ -84,7 +84,7 @@ def validate_and_update(loaded_config, cwd):
         if key not in category:
             raise ValueError("Unknown category '<%s>' in configuration file." % key)
 
-    path = ["lib", "share", "webapps", "run", "log"]
+    path = ["lib", "share", "webapps", "run", "log", "cache"]
     try:
         path_dict = loaded_config['path']
     except KeyError:
@@ -97,7 +97,7 @@ def validate_and_update(loaded_config, cwd):
         c = CONFIG['path'].copy()
         c.update(path_dict)
 
-        for i in ('lib', 'share', 'run', 'log'):
+        for i in ('lib', 'share', 'run', 'log', 'cache'):
             if not c[i].startswith("/"):
                 c[i] = os.path.join(cwd, c[i])
         t_list = []
