@@ -21,11 +21,12 @@ import signal
 import traceback
 import inspect
 import functools
-
+import logging
 from enum import Enum
 
 _process = []
 
+logger = logging.getLogger(__name__)
 
 def add_process(process):
     _process.append(process)
@@ -90,30 +91,30 @@ class ProcessStatus:
                     return func.__name__ + " defined in module <" + path + ">"
 
     def __set_status__(self, status):
-        print("DEBUG: Status of process <%s> is <%s>" % (self._process_name, status))
+        logger.debug("Status of process <%s> is <%s>" % (self._process_name, status))
         self.__status__ = status
         if len(self._status_cb_list) > 0:
             try:
                 for cb in self._status_cb_list:
                     cb(status)
             except:
-                print("ERROR : Error invoking status listener callback of process <%s>" % self._process_name)
+                logger.error("Error invoking status listener callback of process <%s>" % self._process_name)
                 error = traceback.format_exc()
-                print("ERROR : %s" % error)
+                logger.error("%s" % error)
 
     def add_status_listener(self, callback):
         func = ProcessStatus._get_module_path(callback)
-        print("DEBUG: Adding status listener <%s> for process <%s>" % (func, self._process_name))
+        logger.debug("Adding status listener <%s> for process <%s>" % (func, self._process_name))
         args = len(inspect.signature(callback).parameters)
         if args != 1:
             error = "The callback function <%s> should have 1 argument but passed function has %s" % (func, args)
-            print("INFO: %s" % error)
+            logger.info("%s" % error)
             raise ValueError(error)
         self._status_cb_list.append(callback)
 
     def remove_status_listener(self, callback):
         func = ProcessStatus._get_module_path(callback)
-        print("DEBUG: Removing status listener <%s> for process <%s>" % (func, self._process_name))
+        logger.debug("Removing status listener <%s> for process <%s>" % (func, self._process_name))
         if callback in self._status_cb_list:
             del self._status_cb_list[callback]
         else:
@@ -153,18 +154,18 @@ class Process(ProcessStatus, AsyncTask):
                 self.__set_status__(Status.STARTED)
                 s = yield from self.process.wait()
                 if s != 0:
-                    print("ERROR: Process <%s> terminated "
+                    logger.error("Process <%s> terminated "
                           "with non zero return code <%s>." % (self.name, s))
                     if self.__status__ != Status.RESTARTING:
                         self.__set_status__(Status.TERMINATED)
                 else:
-                    print("INFO: Process <%s> stopped." % (
+                    logger.info("Process <%s> stopped." % (
                         self.name))
                     if self.__status__ != Status.RESTARTING:
                         self.__set_status__(Status.STOPPED)
             except Exception as e:
-                print("ERROR: %s" % e)
-                print("ERROR: %s" % traceback.format_exc())
+                logger.error("%s" % e)
+                logger.error("%s" % traceback.format_exc())
                 self.__set_status__(Status.TERMINATED)
             finally:
                 self.process_stop_event.set()
@@ -186,8 +187,8 @@ class Process(ProcessStatus, AsyncTask):
 
         except Exception as e:
             error = traceback.format_exc()
-            print("ERROR: %s" % e)
-            print("ERROR: %s" % error)
+            logger.error("%s" % e)
+            logger.error("%s" % error)
             self.__set_status__(Status.STARTFAILED)
 
 
@@ -212,8 +213,8 @@ class Process(ProcessStatus, AsyncTask):
             yield from self.start()
         except InvalidState as e:
             error = traceback.format_exc()
-            print("ERROR: %s" % e)
-            print("ERROR: %s" % error)
+            logger.error("%s" % e)
+            logger.error("%s" % error)
             return
 
     def is_running(self):
@@ -245,13 +246,13 @@ class Process(ProcessStatus, AsyncTask):
             if self.__status__ != Status.RESTARTING:
                 self.__set_status__(Status.STOPPING)
             if not self._is_running():
-                print("ERROR: Process <%s> is already stopped."
+                logger.error("Process <%s> is already stopped."
                       " Ignoring stop request" % self.name)
                 return False
             self.process.send_signal(signal.SIGINT)
             stopped = yield from self._is_stopped(timeout)
             if not stopped:
-                print("ERROR: Process <%s> not stopped with SIGINT signal, killing the process" % self.name)
+                logger.error("Process <%s> not stopped with SIGINT signal, killing the process" % self.name)
                 self.kill()
             return True
         else:
@@ -266,13 +267,13 @@ class Process(ProcessStatus, AsyncTask):
         if self.__status__ == Status.STARTED:
             self.__set_status__(Status.STOPPING)
             if not self._is_running():
-                print("ERROR: Process <%s> is already stopped."
+                logger.error("Process <%s> is already stopped."
                       " Ignoring stop request" % self.name)
                 return False
             self.process.send_signal(signal.SIGTERM)
             yield from self._is_stopped()
             if self._is_running():
-                print("ERROR: Process <%s> not stopped with "
+                logger.error("Process <%s> not stopped with "
                       "SIGTERM signal, killing the process" % self.name)
                 self.kill()
             return True
@@ -284,20 +285,20 @@ class Process(ProcessStatus, AsyncTask):
     @asyncio.coroutine
     def kill(self):
         if not self._is_running():
-            print("ERROR: Process <%s> is already stopped."
+            logger.error("Process <%s> is already stopped."
                   " Ignoring stop request" % self.name)
             return False
         self.process.send_signal(signal.SIGKILL)
         yield from self._is_stopped()
         if self._is_running():
-            print("ERROR: Process <%s> not stopped with "
+            logger.error("Process <%s> not stopped with "
                   "SIGKILL signal, may be the process is in <defunct> state" % self.name)
             return False
         return True
 
     def send_signal(self, sig):
         if not self._is_running():
-            print("ERROR: Process <%s> is already stopped."
+            logger.error("Process <%s> is already stopped."
                   " Ignoring stop request" % self.name)
             return False
         self.process.send_signal(sig)
@@ -325,7 +326,7 @@ class ProcessGroup(AsyncTask, ProcessStatus):
 
             if status in (Status.STOPPED, Status.TERMINATED, Status.STARTFAILED):
                 if self.__status__ != Status.STOPPING:
-                    print("WARNING: Stopping all the process in the ProcessGroup<%s>" % self.name)
+                    logger.warn("Stopping all the process in the ProcessGroup<%s>" % self.name)
                     self.new_async_task(self.stop())
                 else:
                     if len([p for p in self.processes.values() if p["status"]
@@ -434,8 +435,8 @@ class ProcessGroup(AsyncTask, ProcessStatus):
             yield from self.start()
         except InvalidState as e:
             error = traceback.format_exc()
-            print("ERROR: %s" % e)
-            print("ERROR: %s" % error)
+            logger.error("%s" % e)
+            logger.error("%s" % error)
             return
 
     def is_running(self):

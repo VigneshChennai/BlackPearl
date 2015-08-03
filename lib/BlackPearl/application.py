@@ -22,6 +22,7 @@ import pickle
 import inspect
 import os
 import base64
+import logging
 
 from BlackPearl import testing
 from BlackPearl.core import sessions
@@ -29,7 +30,7 @@ from BlackPearl.core import exceptions
 from BlackPearl.core import utils
 from BlackPearl.core.exceptions import RequestInvalid, UnSuccessfulException
 
-
+logger = logging.getLogger(__name__)
 webapp = None
 
 
@@ -209,8 +210,8 @@ def __application__(environ, start_response):
                                         remaining = data_segment
                             except:
                                 status = "500 Internal server error. Check the server logs"
-                                print("ERROR: Error occurred while setting header for file output.")
-                                print("ERROR:", traceback.format_exc())
+                                logger.error("Error occurred while setting header for file output.")
+                                logger.error("ERROR:", traceback.format_exc())
                                 start_response(status, [])
                                 yield traceback.format_exc().encode('UTF-8')
                             else:
@@ -220,8 +221,8 @@ def __application__(environ, start_response):
                                     for data_segment in output:
                                         yield data_segment
                                 except:
-                                    print("ERROR: Error occurred while returning file output.")
-                                    print("ERROR:", traceback.format_exc())
+                                    logger.error("Error occurred while returning file output.")
+                                    logger.error("ERROR:", traceback.format_exc())
                         else:
                             rets = {
                                 "status": 0,

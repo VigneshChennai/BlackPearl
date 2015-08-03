@@ -28,23 +28,37 @@ from enum import Enum
 import os
 import functools
 import pyinotify
+import logging
+import logging.handlers
+
 from BlackPearl.server.core import process
 from BlackPearl.server.core.process import Process, ProcessGroup, AsyncTask, ProcessStatus
 from BlackPearl.server import prechecks
 from BlackPearl.common import fileutils
-from BlackPearl.server.core.logger import Logger
 from BlackPearl.core import webapps as webapps
+
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+logger.addHandler(ch)
+
+formatter = logging.Formatter('[%(asctime)s][%(module)s][%(funcName)s][Line: %(levelno)s][%(levelname)s]: %(message)s')
+ch.setFormatter(formatter)
+
 
 
 @asyncio.coroutine
 def analyse_and_pickle_webapps(pypath, virtenv_folder, pickle_folder, *app_dirs):
     # Will be used to hold the list of webapp analysis result
-    print("INFO: Analysing deployed webapps ....")
+    logger.info("Analysing deployed webapps ....")
 
     webapps_minimal_file = os.path.join(pickle_folder, "webapps.pickle.minimal")
     # Looping over the webapp deployment folders
     for app_dir in app_dirs:
-        print("INFO: Initializing webapps located at <%s>" % app_dir)
+        logger.info("Initializing webapps located at <%s>" % app_dir)
 
         count = 0
         # Looping over the webapp folders deployed in a deployment folder
@@ -52,11 +66,11 @@ def analyse_and_pickle_webapps(pypath, virtenv_folder, pickle_folder, *app_dirs)
             count += 1
             webapp_virtenv = os.path.join(virtenv_folder, webapp_folder + "_path_" + str(count))
             if not os.access(webapp_virtenv, os.F_OK):
-                print("INFO: Creating the virtual environment at <%s>. This till take some time." % webapp_virtenv)
+                logger.info("Creating the virtual environment at <%s>. This till take some time." % webapp_virtenv)
                 virtualenv.create_environment(webapp_virtenv)
-                print("INFO: The virtual environment completed successfully.")
+                logger.info("The virtual environment completed successfully.")
             else:
-                print("INFO: Using the virtual environment at <%s>" % webapp_virtenv)
+                logger.info("Using the virtual environment at <%s>" % webapp_virtenv)
             # Running the analysing working in a separate process to avoid webapp modules getting imported to main
             # process
 
@@ -75,11 +89,11 @@ def analyse_and_pickle_webapps(pypath, virtenv_folder, pickle_folder, *app_dirs)
             yield from p.start()
             yield from p.wait_for_completion()
             if p.status == process.Status.STOPPED:
-                print("INFO: Webapp<%s> analyse completed successfully." % app_dir)
+                logger.info("Webapp<%s> analyse completed successfully." % app_dir)
             else:
-                print("ERROR: Webapp<%s> analyse failed." % app_dir)
+                logger.error(" Webapp<%s> analyse failed." % app_dir)
 
-        print("INFO: Webapps deployed at <%s> initialized" % app_dir)
+        logger.info("Webapps deployed at <%s> initialized" % app_dir)
 
     if os.access(webapps_minimal_file, os.F_OK):
         with open(webapps_minimal_file, "rb") as rb:
@@ -87,11 +101,11 @@ def analyse_and_pickle_webapps(pypath, virtenv_folder, pickle_folder, *app_dirs)
     else:
         analyse_result_list = []
 
-    print("INFO: List of initialized webapps : %s" % analyse_result_list)
+    logger.info("List of initialized webapps : %s" % analyse_result_list)
 
     # Writing webapp list to file
     da_file = os.path.join(pickle_folder, "deployed_apps.pickle")
-    print("INFO: Writing deployed apps information to file <%s>." % da_file)
+    logger.info("Writing deployed apps information to file <%s>." % da_file)
     data = []
     for ret in analyse_result_list:
         data.append({"name": ret.name, "url_prefix": ret.url_prefix})
@@ -108,8 +122,8 @@ def precheck():
         return True
     except:
         error = traceback.format_exc()
-        print("ERROR: Error during the precheck.")
-        print("ERROR: ", error)
+        logger.error(" Error during the precheck.")
+        logger.error(" ", error)
         return False
 
 
@@ -141,12 +155,12 @@ class Uwsgi(ProcessGroup):
     def add_apps(self, webapps_list):
         deployed_apps_id = [w.id for w in self.webapps_list]
         new_apps_id = [w.id for w in webapps_list]
-        print("DEBUG: Already deployed apps :", deployed_apps_id)
-        print("DEBUG: Apps recently analyzed :", new_apps_id)
+        logger.debug("Already deployed apps :", deployed_apps_id)
+        logger.debug("Apps recently analyzed :", new_apps_id)
         apps_to_start = [webapp for webapp in webapps_list if webapp.id not in deployed_apps_id]
         apps_to_stop = [webapp for webapp in self.webapps_list if webapp.id not in new_apps_id]
         for webapp in apps_to_stop:
-            print("DEBUG: Stopping uWsgi Service for <", webapp.name, "(", webapp.url_prefix,
+            logger.debug("Stopping uWsgi Service for <", webapp.name, "(", webapp.url_prefix,
                   ") > webapp as it is removed or it has error after recent code change")
             yield from self.remove_process("'%s' uWsgi Service" % webapp.id)
 
@@ -157,7 +171,7 @@ class Uwsgi(ProcessGroup):
 
     def _add_apps(self, apps_to_start):
         for webapp in apps_to_start:
-            print("DEBUG: Starting uWsgi Service for <", webapp.name, "(", webapp.url_prefix, ") > webapp")
+            logger.debug("Starting uWsgi Service for <", webapp.name, "(", webapp.url_prefix, ") > webapp")
             command = [self.uwsgi_loc, '--ini', "%s/uwsgi/%s.conf" % (self.run_loc, webapp.id)]
             self.add_process(
                 name="'%s' uWsgi Service" % webapp.id, command=command,
@@ -181,12 +195,12 @@ class Uwsgi(ProcessGroup):
         opt = {}
         for key, value in self.uwsgi_options.items():
             if key in Uwsgi.__immutable_options__:
-                print("WARNING: uWsgi options<%s> can't be overridden. Ignoring .. ")
+                logger.warn("uWsgi options<%s> can't be overridden. Ignoring .. ")
                 continue
             opt[key] = value
 
         for webapp in self.webapps_list:
-            print("INFO: Using python at <%s> for webapp<%s>" % (webapp.python_path, webapp.name))
+            logger.info("Using python at <%s> for webapp<%s>" % (webapp.python_path, webapp.name))
             config = {"socket": webapp.socket, "wsgi-file": self.uwsgi_file,
                       "logto": '%s/uwsgi/%s.log' % (self.logs_dir, webapp.id),
                       "pidfile": '%s/uwsgi/%s.pid' % (self.run_loc, webapp.id), "buffer-size": '32768',
@@ -202,6 +216,7 @@ class Uwsgi(ProcessGroup):
                 f.write("\n".join(conf_list))
 
     def reload_conf(self):
+        # FIXME: Need to fix this function
         self.send_signal(signal.SIGHUP)
 
 
@@ -357,7 +372,7 @@ class AppServer(AsyncTask, ProcessStatus):
                                                                  )
 
             if not webapps_list:
-                print("SEVERE: No application deployed.")
+                logger.critical("No application deployed.")
                 raise NoApplicationDeployedError("No application deployed")
 
             for webapp in webapps_list:
@@ -385,13 +400,13 @@ class AppServer(AsyncTask, ProcessStatus):
             self.uwsgi.add_status_listener(functools.partial(self._service_status_update_cb, "uwsgi"))
 
         except:
-            print("EROOR: Failed to initialize the environment.")
-            print("ERROR: %s" % traceback.format_exc())
+            logger.error("Failed to initialize the environment.")
+            logger.error(" %s" % traceback.format_exc())
         else:
             self.environment_initialized = True
 
     def _code_update_monitor_init(self):
-        print("INFO: Watching <%s> paths for file modifications." % str(self.webapp_locations))
+        logger.info("Watching <%s> paths for file modifications." % str(self.webapp_locations))
         paths = self.webapp_locations
         excl = pyinotify.ExcludeFilter([al + "/*/src/static" for al in self.webapp_locations])
         self.afm = fileutils.AsyncFileMonitor(self._code_update_cb, loop=self.ev_loop)
@@ -401,13 +416,13 @@ class AppServer(AsyncTask, ProcessStatus):
         def signal_handler(signum):
             print('Received signal : ', signum)
             if signum in (signal.SIGTERM, signal.SIGINT, signal.SIGABRT):
-                print("INFO: Stopping BlackPearl service")
+                logger.info("Stopping BlackPearl service")
                 self.new_async_task(self.stop())
             elif signum == signal.SIGHUP:
-                print("INFO: Redeploy BlackPearl")
+                logger.info("Redeploy BlackPearl")
                 self.reload_conf()
             else:
-                print("INFO: Ignoring signal")
+                logger.info("Ignoring signal")
 
         for signal_name in ('SIGINT', 'SIGTERM', 'SIGABRT', 'SIGHUP'):
             sig = getattr(signal, signal_name)
@@ -427,9 +442,9 @@ class AppServer(AsyncTask, ProcessStatus):
                 future.result()
             except Exception as e:
                 error = traceback.format_exc()
-                print("ERROR: %s" % e)
-                print("ERROR: %s" % error)
-                print("SEVERE: %s failed to start" % service)
+                logger.error(" %s" % e)
+                logger.error(" %s" % error)
+                logger.critical("%s failed to start" % service)
 
         uwsgi_task = asyncio.async(self.uwsgi.start())
         nginx_task = asyncio.async(self.nginx.start())
@@ -447,9 +462,9 @@ class AppServer(AsyncTask, ProcessStatus):
                 future.result()
             except Exception as e:
                 error = traceback.format_exc()
-                print("ERROR: %s" % e)
-                print("ERROR: %s" % error)
-                print("SEVERE: %s failed to stop" % service)
+                logger.error(" %s" % e)
+                logger.error(" %s" % error)
+                logger.critical("%s failed to stop" % service)
 
         uwsgi_task = asyncio.async(self.uwsgi.stop())
         nginx_task = asyncio.async(self.nginx.stop())
@@ -467,9 +482,9 @@ class AppServer(AsyncTask, ProcessStatus):
                 future.result()
             except Exception as e:
                 error = traceback.format_exc()
-                print("ERROR: %s" % e)
-                print("ERROR: %s" % error)
-                print("SEVERE: %s failed to restart" % service)
+                logger.error(" %s" % e)
+                logger.error(" %s" % error)
+                logger.critical("%s failed to restart" % service)
 
         uwsgi_task = asyncio.async(self.uwsgi.restart())
         nginx_task = asyncio.async(self.nginx.restart())
@@ -483,7 +498,7 @@ class AppServer(AsyncTask, ProcessStatus):
         self.new_async_task(self.uwsgi.wait_for_completion())
         self.new_async_task(self.nginx.wait_for_completion())
         yield from self.wait_for_async_task_completion()
-        print("INFO: BlackPearl service was shutdown")
+        logger.info("BlackPearl service was shutdown")
 
     def reload_conf(self):
         self.uwsgi.reload_conf()
@@ -507,7 +522,7 @@ class AppServer(AsyncTask, ProcessStatus):
 
                 self.afm.update_watch_path(rec=True)
                 if not webapps_list:
-                    print("WARNING: Old code retained."
+                    logger.warn("Old code retained."
                           " Modified code not redeployed.")
                 else:
                     modified_webapps = []
@@ -522,15 +537,15 @@ class AppServer(AsyncTask, ProcessStatus):
 
                     self.nginx.generate_conf_file(webapps_list)
                     for m_webapp in modified_webapps:
-                        print("INFO: Reloading webapp <", m_webapp.name, ">")
+                        logger.info("Reloading webapp <", m_webapp.name, ">")
                         with open('%s/uwsgi/%s.reload' % (self.uwsgi.run_loc, m_webapp.id), "w") as f:
                             f.write("reload workers")
 
                     yield from self.uwsgi.add_apps(webapps_list)
                     self.nginx.reload_conf()
-                    print("INFO: Code updated.")
+                    logger.info("Code updated.")
             else:
-                print("INFO: Server is in <%s> state. Ignoring restart request." % self.__status__)
+                logger.info("Server is in <%s> state. Ignoring restart request." % self.__status__)
         finally:
             self.reloading_code = False
 
@@ -550,83 +565,88 @@ class AppServer(AsyncTask, ProcessStatus):
 
             if other_status not in (process.Status.STOPPED, process.Status.TERMINATED, process.Status.STARTFAILED):
                 if self.__status__ != Status.STOPPING:
-                    print("SEVERE: %s service stopped unexpectedly" % service)
-                    print("SEVERE: So, stopping %s service as well" % other_service)
+                    logger.critical("%s service stopped unexpectedly" % service)
+                    logger.critical("So, stopping %s service as well" % other_service)
                     self.new_async_task(other_service_obj.stop())
             else:
                 if self.__status__ == Status.NOTSTARTED:
                     self.__set_status__(Status.TERMINATED)
-                    print("ERROR: Failed to startup")
+                    logger.error(" Failed to startup")
 
                 elif self.__status__ == Status.RESTARTING:
                     self.__set_status__(Status.TERMINATED)
-                    print("INFO: Service restart failed.")
+                    logger.info("Service restart failed.")
 
                 elif self.__status__ == Status.STOPPING:
                     self.__set_status__(Status.STOPPED)
-                    print("INFO: Services stopped.")
+                    logger.info("Services stopped.")
 
                 elif self.__status__ == Status.STARTED:
                     self.__set_status__(Status.TERMINATED)
-                    print("ERROR: Services terminated unexpectedly")
+                    logger.error(" Services terminated unexpectedly")
         elif status == process.Status.RESTARTING:
-            print("INFO: Service <%s> getting restarted." % service)
+            logger.info("Service <%s> getting restarted." % service)
 
         elif status == process.Status.STARTED and other_status == process.Status.STARTED:
-            print("INFO: Service <%s> started up." % service)
+            logger.info("Service <%s> started up." % service)
             if self.__status__ == Status.RESTARTING:
                 self.__set_status__(Status.STARTED)
-                print("INFO: Services restarted.")
+                logger.info("Services restarted.")
             elif self.__status__ != Status.STARTED:
                 self.__set_status__(Status.STARTED)
-                print("INFO: Services started up")
+                logger.info("Services started up")
 
         elif status == process.Status.STARTED:
-            print("INFO: Service <%s> started up." % service)
+            logger.info("Service <%s> started up." % service)
 
         return True
 
     def _code_update_cb(self, event):
         if os.path.isdir(event.pathname) or event.pathname.endswith(".py"):
-            print("INFO: File<%s> modified." % event.pathname)
+            logger.info("File<%s> modified." % event.pathname)
             self.modified_files.append(event.pathname)
             if not self.reloading_code:
                 self.new_async_task(self.reload_code())
 
 
-# From my gist - https://gist.github.com/VigneshChennai/35bb64d41e4a4beb2225
-def daemonize(log_file, wd="/", umask=0):
+def daemonize(log_folder, wd="/", umask=0):
     try:
         f = os.fork()
     except OSError as e:
-        print("SEVERE: Error forking.. <{fork}>".format(fork=e))
-        print("SEVERE: Trace -> {trace}".format(
+        logger.critical("Error forking.. <{fork}>".format(fork=e))
+        logger.critical("Trace -> {trace}".format(
             trace=traceback.format_exc()))
         raise e from None
 
     if f != 0:
         sys.exit(0)
     else:
-        signal.signal(signal.SIGHUP, lambda x, y: print("SIGHUP received during process forking, ignoring signal"))
+        signal.signal(signal.SIGHUP, lambda x, y: logger.info("SIGHUP received during process forking, ignoring signal"))
         os.chdir(wd)
         os.setsid()
         os.umask(umask)
         try:
             f = os.fork()
         except OSError as e:
-            print("SEVERE: Error forking.. <{fork}>".format(fork=e))
-            print("SEVERE: Trace -> {trace}".format(
+            logger.critical("Error forking.. <{fork}>".format(fork=e))
+            logger.critical("Trace -> {trace}".format(
                 trace=traceback.format_exc()))
             raise e from None
 
         if f != 0:
             sys.exit(0)
 
-        print("INFO: Started as Daemon")
+        logger.info("Started as Daemon")
+
+        ch = logging.handlers.RotatingFileHandler(os.path.join(log_folder, "server.log"), mode='a',
+                                                  maxBytes=(10 * 1024 * 1024), backupCount=5, encoding="UTF-8", delay=0)
+        ch.setLevel(logging.INFO)
+        logger.addHandler(ch)
+
         r = open("/dev/null", "r")
         os.dup2(r.fileno(), 0)
         buffering = 1  # line buffering
-        w = open(log_file, "w", buffering=buffering)
+        w = open(os.path.join(log_folder, "server.out"), "w", buffering=buffering)
         os.dup2(w.fileno(), 1)
         os.dup2(w.fileno(), 2)
 
@@ -638,23 +658,19 @@ def start(config, daemon=False):
         prechecks.check_all()
     except Exception as e:
         print("[Failed]")
-        print("SEVERE: %s" % str(e))
-        print("BlackPearl server not started ....")
+        logger.critical("%s" % str(e))
+        logger.info("BlackPearl server not started ....")
         sys.exit(-1)
     else:
         print("[Ok]")
         if daemon:
-            print("INFO: Starting BlackPearl in daemon mode ...")
+            logger.info("Starting BlackPearl in daemon mode ...")
             try:
-                daemonize(log_file=path['log'] + "/server.log")
+                daemonize(log_folder=path['log'])
             except OSError:
-                print("ERROR:", traceback.format_exc())
-                print("ERROR: Unable to start the server in daemon mode. Exiting.")
+                logger.error(traceback.format_exc())
+                logger.error("Unable to start the server in daemon mode. Exiting.")
                 sys.exit(1)
-
-        # Initializing logger
-        logger = Logger(Logger.DEBUG)
-        logger.initialize()
 
         # Writing BlackPearl PID to file
         with open(path['run'] + "/BlackPearl.pid", "w") as f:
@@ -673,7 +689,7 @@ def start(config, daemon=False):
 
             # Waits till server starts
             ev_loop.run_until_complete(start_task)
-            print("INFO: BlackPearl services started.")
+            logger.info("BlackPearl services started.")
 
             try:
                 # Waiting for server to shutdown
@@ -681,7 +697,7 @@ def start(config, daemon=False):
             finally:
                 ev_loop.close()
         else:
-            print("ERROR: BlackPearl services not started due to the issue occurred during environment initialization.")
+            logger.error(" BlackPearl services not started due to the issue occurred during environment initialization.")
             ev_loop.close()
 
 

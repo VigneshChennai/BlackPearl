@@ -16,7 +16,11 @@
 # along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
 
 import re
+import logging
+
 from io import StringIO
+
+logger = logging.getLogger(__name__)
 
 
 class _Field:

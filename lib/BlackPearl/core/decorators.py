@@ -16,8 +16,11 @@
 # along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
 
 import inspect
+import logging
 
 from . import utils
+
+logger = logging.getLogger(__name__)
 
 
 class ClassMethodInvoker:
@@ -124,10 +127,10 @@ def preprocessor(function):
     if inspect.isfunction(function):
         signature = inspect.signature(function)
         if len(signature.parameters) != 2:
-            print("WARNING: Preprocessor should have 2 argument but"
+            logger.warn("Preprocessor should have 2 argument but"
                   " <%s> has <%s> arguments" % (function.__name__ + "at" + utils.get_module_name(function),
                                                 len(signature.parameters)))
-            print("WARNING: Ignoring the preprocessor")
+            logger.warn("Ignoring the preprocessor")
             return function
 
         function.__preprocessor__ = {
@@ -137,8 +140,8 @@ def preprocessor(function):
         }
         return function
     else:
-        print("WARNING: Not implemented to support " + str(type(function)))
-        print("WARNING: Ignoring the preprocessor")
+        logger.warn("Not implemented to support " + str(type(function)))
+        logger.warn("Ignoring the preprocessor")
         return function
 
 
@@ -147,10 +150,10 @@ def posthandler(function):
     if inspect.isfunction(function):
         signature = inspect.signature(function)
         if len(signature.parameters) != 3:
-            print("WARNING: Posthandler should have 3 argument but"
+            logger.warn("Posthandler should have 3 argument but"
                   " <%s> has <%s> arguments" % (function.__name__ + "at" + utils.get_module_name(function),
                                                 len(signature.parameters)))
-            print("WARNING: Ignoring the posthandler")
+            logger.warn("Ignoring the posthandler")
             return function
 
         function.__posthandler__ = {
@@ -160,6 +163,6 @@ def posthandler(function):
         }
         return function
     else:
-        print("WARNING: Not implemented to support " + str(type(function)))
-        print("WARNING: Ignoring the posthandler")
+        logger.warn("Not implemented to support " + str(type(function)))
+        logger.warn("Ignoring the posthandler")
         return function

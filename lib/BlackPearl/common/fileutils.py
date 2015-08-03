@@ -16,8 +16,10 @@
 # along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
-
+import logging
 import pyinotify
+
+logger = logging.getLogger(__name__)
 
 
 class AsyncFileMonitor(pyinotify.Notifier):

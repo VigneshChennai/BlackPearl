@@ -18,9 +18,12 @@
 import sys
 import inspect
 import traceback
-from io import StringIO
+import logging
 
+from io import StringIO
 from . import datatype
+
+logger = logging.getLogger(__name__)
 
 
 def get_module_name(func):
@@ -79,7 +82,7 @@ def validate_parameter(signature, parameter):
                     # Validating the data with annotated datatype
                     updated_args[name] = datatype.parse(annotation, value)
                 except Exception as e:
-                    print("WARNING: %s" % (traceback.format_exc()))
+                    logger.warn("%s" % (traceback.format_exc()))
                     raise Exception("Invalid data for parameter <" + name + "> : "
                                     + str(e))
 
@@ -114,7 +117,7 @@ def validate_parameter(signature, parameter):
                         try:
                             parsed_value.append(datatype.parse(annotation, v))
                         except Exception as e:
-                            print("WARNING: %s" % (traceback.format_exc()))
+                            logger.warn("%s" % (traceback.format_exc()))
                             raise Exception("Invalid data for parameter <" + name + "> : "
                                             + str(e))
 

@@ -15,9 +15,13 @@
 # You should have received a copy of the GNU General Public License
 # along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
 
+import logging
+
 from BlackPearl.core.decorators import weblocation
 from BlackPearl import application
 from BlackPearl.core.exceptions import RequestInvalid, UnSuccessfulException
+
+logger = logging.getLogger(__name__)
 
 
 @weblocation('/__test_run__')

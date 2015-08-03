@@ -20,20 +20,25 @@ import sys
 import pickle
 import traceback
 import pip
+import logging
 
-from BlackPearl.server.core.logger import Logger
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
-# Initializing logger
-logger = Logger(Logger.DEBUG)
-logger.initialize()
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+logger.addHandler(ch)
+
+formatter = logging.Formatter('[%(asctime)s][%(module)s][%(funcName)s][Line: %(levelno)s][%(levelname)s]: %(message)s')
+ch.setFormatter(formatter)
 
 
 for package in ('PyYaml', 'pycrypto', 'requests'):
     if pip.main(['install', package]) == 1:
-        print("ERROR: Failed to install package<%s> in the new virtualenv." % package)
+        logger.error("Failed to install package<%s> in the new virtualenv." % package)
         sys.exit(1)
 
-print("INFO: Packages installed successfully.")
+logger.info("Packages installed successfully.")
 
 from BlackPearl.core.webapps import WebAppMinimal
 from BlackPearl.core import webapps as webapps
@@ -49,18 +54,18 @@ def analyser(webapps_pickle_minimal, pickle_folder, location, folder):
             webapps_minimal = pickle.load(rb)
 
     try:
-        print("INFO: Analysing webapp <%s> ...." % folder)
+        logger.info("Analysing webapp <%s> ...." % folder)
         # Analysing the webapp folder and returning the analysis result
         webapp = webapps.analyze(location, folder)
-        print("INFO: Webapp analysing completed.")
-        print("INFO: Webapp details : %s" % webapp)
+        logger.info("Webapp analysing completed.")
+        logger.info("Webapp details : %s" % webapp)
 
         # Pickling the webapp information
         f = os.path.join(pickle_folder, webapp.id + ".pickle")
-        print("INFO: Writing analysed information to file <%s>." % f)
+        logger.info("Writing analysed information to file <%s>." % f)
         with open(f, "wb") as pickle_file:
             pickle.dump(webapp, pickle_file)
-        print("INFO: Write completed")
+        logger.info("Write completed")
 
         webapp_minimal = WebAppMinimal(webapp, f)
         webapp_minimal.python_home_path = sys.exec_prefix
@@ -70,8 +75,8 @@ def analyser(webapps_pickle_minimal, pickle_folder, location, folder):
         with open(webapps_pickle_minimal, "wb") as f:
             pickle.dump(webapps_minimal, f)
     except:
-        print("ERROR: Fatal error during analysing webapps.")
-        print("ERROR: %s" % traceback.format_exc())
+        logger.error("Fatal error during analysing webapps.")
+        logger.error("%s" % traceback.format_exc())
 
 
 def main():

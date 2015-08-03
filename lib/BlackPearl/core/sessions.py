@@ -17,10 +17,13 @@
 
 import time
 import pickle
+import logging
 
 from http.cookies import SimpleCookie
-
 from BlackPearl.common.security import encrypt, decrypt
+
+logger = logging.getLogger(__name__)
+
 
 # The below two variables will be initialized during the start of uwsgi
 BLOCK_SIZE = 0

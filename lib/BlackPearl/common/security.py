@@ -16,8 +16,12 @@
 # along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
 
 import base64
+import logging
 
 from Crypto.Cipher import AES
+
+logger = logging.getLogger(__name__)
+
 
 PADDING = b"{"
 

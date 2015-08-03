@@ -389,8 +389,8 @@ if __name__ == "__main__":
         print("ERROR: Exiting ...")
         sys.exit(1)
     except:
-        print("SEVERE: Unexpected error occurred.")
-        print("SEVERE: %s" % traceback.format_exc())
+        logger.critical("Unexpected error occurred.")
+        logger.critical("%s" % traceback.format_exc())
         sys.exit(1)
     else:
         try:
@@ -407,9 +407,9 @@ if __name__ == "__main__":
             else:
                 configuration = load(config_path)
         except Exception as e:
-            print("SEVERE: %s" % str(e))
+            logger.critical("%s" % str(e))
             print("SEVERE:", traceback.format_exc())
-            print("SEVERE: Error occurred. Stopping the blackpearl server.")
+            logger.critical("Error occurred. Stopping the blackpearl server.")
             sys.exit(1)
 
         sys.path.append(configuration['path']['lib'])
@@ -432,5 +432,5 @@ if __name__ == "__main__":
                 from BlackPearl.tools.newapp import invoke
                 invoke(**args_copy)
             except:
-                print("SEVERE: Error occurred while creating new webapp.")
+                logger.critical("Error occurred while creating new webapp.")
                 print("SEVERE:", traceback.format_exc())

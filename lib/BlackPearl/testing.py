@@ -19,12 +19,12 @@
 import json
 import inspect
 import traceback
-
+import logging
 import requests
 
 from time import strftime
 
-
+logger = logging.getLogger(__name__)
 
 __all__ = ['testset', 'testcase', 'test', 'TestcaseFailed',
            'InvalidTestcaseInvoke', 'ErrorInvokingWebModule',
@@ -59,7 +59,7 @@ class TestsetInvoker:
                 "prints": testset_outs
             }
         except TestcaseError as e:
-            print("ERROR: %s" % traceback.format_exc())
+            logger.error("%s" % traceback.format_exc())
             testset_outs.append('[%s] %s' % (strftime("%Y-%m-%d %H:%M:%S"),
                                              "Testset<%s> terminated due to an internal"
                                              " error." % self.name))

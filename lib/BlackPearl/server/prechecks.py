@@ -16,7 +16,9 @@
 # along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
+import logging
 
+logger = logging.getLogger(__name__)
 
 MIN_SUPPORTED_VERSION = (3, 4, 2)
 

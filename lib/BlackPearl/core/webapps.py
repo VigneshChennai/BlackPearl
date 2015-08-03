@@ -22,8 +22,11 @@ import os
 import importlib
 import yaml
 import pip
+import logging
 
 from . import utils
+
+logger = logging.getLogger(__name__)
 
 
 class WebAppMinimal:
@@ -86,7 +89,7 @@ class Webapp:
     def initialize(self):
         """initializes the webapp"""
 
-        print("INFO: Initializing webapp folder <%s>" % self.folder_name)
+        logger.info("Initializing webapp folder <%s>" % self.folder_name)
         try:
             with open(os.path.join(self.location, "config.yaml")) as config_file:
                 loaded_config = yaml.load(config_file)
@@ -99,12 +102,12 @@ class Webapp:
                 setattr(config, key, value)
 
         except yaml.parser.ParserError:
-            print("SEVERE: config.yaml contains errors")
-            print("SEVERE: Actual error: ", traceback.format_exc())
+            logger.critical("config.yaml contains errors")
+            logger.critical("Actual error: ", traceback.format_exc())
             return False
         except:
-            print("SEVERE: config.yaml not found inside webapp <%s> or error loading it" % self.folder_name)
-            print("SEVERE: Actual error: ", traceback.format_exc())
+            logger.critical("config.yaml not found inside webapp <%s> or error loading it" % self.folder_name)
+            logger.critical("Actual error: ", traceback.format_exc())
             return False
 
         self._init_basics(config)
@@ -112,7 +115,7 @@ class Webapp:
         try:
             self._init_handlers(config)
         except:
-            print("SEVERE: ", traceback.format_exc())
+            logger.critical("", traceback.format_exc())
             return False
 
         try:
@@ -120,22 +123,22 @@ class Webapp:
                          if testset.endswith(".py")]
 
             if len(test_sets) == 0:
-                print("INFO: No testsets defined.")
+                logger.info("No testsets defined.")
             for test_set in test_sets:
                 try:
-                    print("INFO: Initializing test sets in <", test_set, ">", sep="")
+                    logger.info("Initializing test sets in <", test_set, ">", sep="")
                     test = importlib.import_module(test_set)
                 except ImportError as e:
-                    print("WARNING: Failed to initialize testcase in the webapp", self.name)
-                    print("WARNING: Reason:", str(e))
+                    logger.warn("Failed to initialize testcase in the webapp", self.name)
+                    logger.warn("Reason:", str(e))
                 else:
                     self._init_testcases(test)
         except:
-            print("ERROR: Initializing the testcases")
-            print("ERROR: %s" % traceback.format_exc())
-            print("WARNING: Ignoring testcases in this webapp")
+            logger.error("Initializing the testcases")
+            logger.error("%s" % traceback.format_exc())
+            logger.warn("Ignoring testcases in this webapp")
 
-        print("INFO: Initialization of webapp <%s> completed." % self.name)
+        logger.info("Initialization of webapp <%s> completed." % self.name)
         return True
 
     def _init_basics(self, config):
@@ -171,17 +174,17 @@ class Webapp:
         try:
             config.url_prefix = config.url_prefix.strip()
             if len(config.url_prefix) == 0:
-                print("WARNING: Webapp<%s> - Empty url_prefix is set in the"
+                logger.warn("Webapp<%s> - Empty url_prefix is set in the"
                       " configuration file" % self.name)
-                print("WARNING: Using folder name </%s> as url_prefix for this webapp." % self.folder_name)
+                logger.warn("Using folder name </%s> as url_prefix for this webapp." % self.folder_name)
                 self.url_prefix = '/' + self.folder_name
             else:
                 if config.url_prefix.startswith('/'):
                     self.url_prefix = config.url_prefix
                 else:
-                    print("WARNING: url_prefix is not defined with '/' in the "
+                    logger.warn("url_prefix is not defined with '/' in the "
                           "beginning. but defined as <%s>" % self.url_prefix)
-                    print("WARNING: Adding '/' in front in URL prefix.")
+                    logger.warn("Adding '/' in front in URL prefix.")
                     self.url_prefix = '/' + config.url_prefix
 
         except AttributeError:
@@ -195,7 +198,7 @@ class Webapp:
         else:
             self.id = self.url_prefix[1:].replace("/","_")
 
-        print("INFO: URL prefix <%s>" % self.url_prefix)
+        logger.info("URL prefix <%s>" % self.url_prefix)
 
         try:
             self.defined_posthandlers = config.posthandlers
@@ -214,9 +217,9 @@ class Webapp:
             if len(self.handlers) == 0:
                 raise AttributeError("Handlers list is empty")
         except AttributeError:
-            print("SEVERE: Webapp<%s> - configuration doesn't defined"
+            logger.critical("Webapp<%s> - configuration doesn't defined"
                   " the list of handlers." % self.name)
-            print("WARNING: See below for error occurred.\n"
+            logger.warn("See below for error occurred.\n"
                   + traceback.format_exc())
             raise Exception("Error initializing handlers")
 
@@ -224,23 +227,23 @@ class Webapp:
         self.handlers.insert(0, "BlackPearl.core.handlers")
         for handler in self.handlers:
             try:
-                print("INFO: Initializing handler <%s>" % handler)
+                logger.info("Initializing handler <%s>" % handler)
                 module = importlib.import_module(handler)
                 self._parse_module(module)
                 count += 1
             except:
-                print("WARNING: Webapp<%s> - Error initializing handler <%s>."
+                logger.warn("Webapp<%s> - Error initializing handler <%s>."
                       "Ignoring handler .." % (self.name, handler))
-                print("WARNING: See below for error occurred.\n"
+                logger.warn("See below for error occurred.\n"
                       + traceback.format_exc())
 
         if count == 0:
-            print("SEVERE: Webapp<%s> - Failed to import all the defined"
+            logger.critical("Webapp<%s> - Failed to import all the defined"
                   " handler." % self.name)
             raise Exception("Error initializing handlers")
 
     def _init_testcases(self, test):
-        print("INFO: Initializing testcases")
+        logger.info("Initializing testcases")
 
         for name, member in inspect.getmembers(test):
             try:
@@ -266,7 +269,7 @@ class Webapp:
 
     def _check_url(self, url, name, member):
         if url in self.webmodules:
-            print("WARNING: Url<%s> is already defined. "
+            logger.warn("Url<%s> is already defined. "
                   "Ignoring webmodule<%s> defined in <%s>" % (url, name, inspect.getmodule(member).__file__))
             return False
         return True
@@ -290,7 +293,7 @@ class Webapp:
                     if member.__preprocessor__['name'] in self.defined_preprocessors:
                         self.preprocessors.append(member.__preprocessor__)
                     else:
-                        print("WARNING: Webapp <%s> - Preprocessor<%s> not "
+                        logger.warn("Webapp <%s> - Preprocessor<%s> not "
                               "listed in preprocessor list.."
                               " Ignoring preprocessor."
                               % (self.name, member.__preprocessor__['name']))
@@ -298,7 +301,7 @@ class Webapp:
                     if member.__posthandler__['name'] in self.defined_posthandlers:
                         self.posthandlers.append(member.__posthandler__)
                     else:
-                        print("WARNING: Webapp <%s> - Posthandler<%s> not "
+                        logger.warn("Webapp <%s> - Posthandler<%s> not "
                               "listed in posthandler list.."
                               " Ignoring posthandler."
                               % (self.name, member.__posthandler__['name']))
@@ -320,44 +323,44 @@ class NotEnabledError(Exception):
 
 def get_webapp_folders(location):
     if not os.access(location, os.F_OK):
-        print("WARNING: Webapps folder<%s> not found. Ignoring.. " % location)
+        logger.warn("Webapps folder<%s> not found. Ignoring.. " % location)
     return [name for name in os.listdir(location) if os.path.isdir(location + os.path.sep + name)]
 
 
 def analyze(location, webapp_folder):
     """Initializes the web applications"""
     if not os.access(location, os.F_OK):
-        print("WARNING: Webapps folder<%s> not found. Ignoring.. " % location)
+        logger.warn("Webapps folder<%s> not found. Ignoring.. " % location)
         return
 
     for l in (os.path.join(location, webapp_folder, "src", "api"),
               os.path.join(location, webapp_folder, "lib"),
               os.path.join(location, webapp_folder, 'test')):
-        print("INFO: Adding <%s> to python path." % l)
+        logger.info("Adding <%s> to python path." % l)
         sys.path.append(l)
 
     req_file = os.path.join(location, webapp_folder, "requirements.txt")
 
     if os.access(req_file, os.F_OK):
-        print("INFO: Requirements file found at <%s>" % req_file)
+        logger.info("Requirements file found at <%s>" % req_file)
         for package in req_file:
             if pip.main(['install', package]) == 1:
-                print("ERROR: Failed to install the library <%s> required by the webapp <%s>.  " %
+                logger.error("Failed to install the library <%s> required by the webapp <%s>.  " %
                       (package, webapp_folder))
                 return
 
-        print("INFO: Packages installed successfully.")
+        logger.info("Packages installed successfully.")
     else:
-        print("INFO: Requirements file not found.")
+        logger.info("Requirements file not found.")
 
     try:
         webapp = Webapp(location, webapp_folder)
         if webapp.initialize():
             return webapp
         else:
-            print("SEVERE: Ignoring the webapp")
+            logger.critical("Ignoring the webapp")
     except NotEnabledError:
-        print("INFO: Ignoring <%s> as is it disabled in configuration file")
+        logger.info("Ignoring <%s> as is it disabled in configuration file")
     except:
         traceback.print_exc()
-        print("Error initializing : %s" % webapp_folder)
+        logger.error("Error initializing : %s" % webapp_folder)
