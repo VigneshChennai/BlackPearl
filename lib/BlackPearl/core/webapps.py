@@ -21,6 +21,7 @@ import inspect
 import os
 import importlib
 import yaml
+import pip
 
 from . import utils
 
@@ -334,6 +335,20 @@ def analyze(location, webapp_folder):
               os.path.join(location, webapp_folder, 'test')):
         print("INFO: Adding <%s> to python path." % l)
         sys.path.append(l)
+
+    req_file = os.path.join(location, webapp_folder, "requirements.txt")
+
+    if os.access(req_file, os.F_OK):
+        print("INFO: Requirements file found at <%s>" % req_file)
+        for package in req_file:
+            if pip.main(['install', package]) == 1:
+                print("ERROR: Failed to install the library <%s> required by the webapp <%s>.  " %
+                      (package, webapp_folder))
+                return
+
+        print("INFO: Packages installed successfully.")
+    else:
+        print("INFO: Requirements file not found.")
 
     try:
         webapp = Webapp(location, webapp_folder)

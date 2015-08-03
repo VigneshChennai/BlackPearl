@@ -75,7 +75,7 @@ class Session:
 
     @webname("fileinputtest")
     def fileinput(self, file:datatype.File(), value):
-        few_bytes = file['file'].read(500);
+        few_bytes = file['file'].read(500)
         try:
             data = few_bytes.decode('UTF-8')
         except:

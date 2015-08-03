@@ -32,11 +32,12 @@ for package in ('PyYaml', 'pycrypto', 'requests'):
     if pip.main(['install', package]) == 1:
         print("ERROR: Failed to install package<%s> in the new virtualenv." % package)
         sys.exit(1)
-    else:
-        print("INFO: Packages installed successfully.")
+
+print("INFO: Packages installed successfully.")
 
 from BlackPearl.core.webapps import WebAppMinimal
 from BlackPearl.core import webapps as webapps
+
 
 # Analyses the single webapp folder
 def analyser(webapps_pickle_minimal, pickle_folder, location, folder):
