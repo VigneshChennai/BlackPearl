@@ -446,6 +446,10 @@ class ProcessGroup(AsyncTask, ProcessStatus):
 
         return False
 
+    def send_signal(self, sig):
+        for name, value in self.processes.items():
+            value['process'].send_signal(sig)
+
 
 class NotStartedYet(Exception):
     def __init__(self, msg):

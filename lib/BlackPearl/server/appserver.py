@@ -22,6 +22,7 @@ import asyncio
 import multiprocessing
 import pickle
 import virtualenv
+import shutil
 
 from enum import Enum
 
@@ -206,7 +207,7 @@ class Uwsgi(ProcessGroup):
                       "pidfile": '%s/uwsgi/%s.pid' % (self.run_loc, webapp.id), "buffer-size": '32768',
                       "touch-workers-reload": '%s/uwsgi/%s.reload' % (self.run_loc, webapp.id),
                       "workers": str(multiprocessing.cpu_count()), "lazy-apps": 'true', "log-maxsize": "10485760",
-                      'home': webapp.python_home_path}
+                      'home': webapp.python_home_path, 'log-maxsize': (5 * 1024 * 1024)}
 
             config.update(opt)
             conf_list = [str(key) + " = " + str(value) for key, value in config.items()]
@@ -216,7 +217,6 @@ class Uwsgi(ProcessGroup):
                 f.write("\n".join(conf_list))
 
     def reload_conf(self):
-        # FIXME: Need to fix this function
         self.send_signal(signal.SIGHUP)
 
 
@@ -334,6 +334,22 @@ class Nginx(Process):
         with open("%s/nginx/nginx.conf" % self.run_loc, "w") as f:
             f.write(conf)
 
+    def check_and_rotate_log(self):
+        access_log = "%s/nginx.access.log" % self.logs_loc
+        error_log = "%s/nginx.error.log" % self.logs_loc
+
+        rotated = False
+        if os.stat(access_log).st_size > (5 * 1024 * 1024):
+            rotated = True
+            shutil.move(access_log, "%s.0" % access_log)
+
+        if os.stat(error_log).st_size > (5 * 1024 * 1024):
+            rotated = True
+            shutil.move(error_log, "%s.0" % access_log)
+
+        if rotated:
+            self.send_signal(signal.SIGUSR1)
+
 
 Status = Enum("Status", "NOTSTARTED, STARTING, STARTFAILED, STARTED, STOPPING, RESTARTING, STOPPED, TERMINATED")
 
@@ -405,6 +421,16 @@ class AppServer(AsyncTask, ProcessStatus):
         else:
             self.environment_initialized = True
 
+    def _init_log_rotation_manager(self):
+        @asyncio.coroutine
+        def monitor():
+            while self.__status__ not in (process.Status.STOPPED, process.Status.TERMINATED,
+                                          process.Status.STARTFAILED):
+                yield asyncio.sleep(30)
+                self.nginx.check_and_rotate_log()
+
+        self.new_async_task(monitor())
+
     def _code_update_monitor_init(self):
         logger.info("Watching <%s> paths for file modifications." % str(self.webapp_locations))
         paths = self.webapp_locations
@@ -436,6 +462,9 @@ class AppServer(AsyncTask, ProcessStatus):
 
         # Initializing handler for OS signal
         self._signal_init()
+
+        # Initializing log rotation manager
+        self._init_log_rotation_manager()
 
         def start_cb(service, future):
             try:
