@@ -126,7 +126,7 @@ class Webapp:
                 logger.info("No testsets defined.")
             for test_set in test_sets:
                 try:
-                    logger.info("Initializing test sets in <", test_set, ">", sep="")
+                    logger.info("Initializing test sets in <%s>", test_set)
                     test = importlib.import_module(test_set)
                 except ImportError as e:
                     logger.warn("Failed to initialize testcase in the webapp", self.name)
