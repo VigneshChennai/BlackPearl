@@ -21,6 +21,7 @@ import inspect
 import os
 import importlib
 import yaml
+import yaml.parser
 import pip
 import logging
 
@@ -47,6 +48,7 @@ class WebAppMinimal:
             "url_prefix": self.url_prefix,
             "location": self.location
         })
+
 
 class Webapp:
     """This class holds all the values corresponding to a web application"""

@@ -24,6 +24,7 @@ import signal
 import time
 import yaml
 import base64
+import logging
 
 startup_notes = """
     BlackPearl is free software. License GPLv3+: GNU GPL version 3 or later
@@ -70,6 +71,12 @@ CONFIG = {
         "auto_generate_key": True
     },
 
+    "logging": {
+        "level": "INFO",
+        "max_log_size": 5 * 1024 * 1024,
+        "max_log_files": 5
+    },
+
     "uwsgi_options": {
         "plugins": "python",
         "log-truncate": True
@@ -78,7 +85,7 @@ CONFIG = {
 
 
 def validate_and_update(loaded_config, cwd):
-    category = ["path", "server", "hostname", "listen", "security", "uwsgi_options"]
+    category = ["path", "server", "hostname", "listen", "security", "logging", "uwsgi_options"]
 
     for key in loaded_config.keys():
         if key not in category:
@@ -155,6 +162,36 @@ def validate_and_update(loaded_config, cwd):
     except KeyError:
         loaded_config['listen'] = CONFIG['listen']
 
+    _logging = ["level", "max_log_size", "max_log_files"]
+    try:
+        logging_dict = loaded_config['logging']
+    except KeyError:
+        loaded_config['logging'] = CONFIG['logging'].copy()
+    else:
+        for key in logging_dict.keys():
+            if key not in _logging:
+                raise ValueError("Unknown value '<%s>' under category <logging> in configuration file." % key)
+
+        log_level_dict = {
+            "INFO": logging.INFO,
+            "WARN": logging.WARNING,
+            "WARNING": logging.WARNING,
+            "DEBUG": logging.DEBUG,
+            "CRITICAL": logging.CRITICAL,
+            "ERROR": logging.ERROR,
+        }
+
+        try:
+            level = log_level_dict[logging_dict["level"].upper()]
+        except KeyError:
+            raise ValueError("Logging Level value should be one of '<%s>'" % log_level_dict.keys())
+        else:
+            logging_dict['level'] = level
+
+        c = CONFIG['logging'].copy()
+        c.update(logging_dict)
+        loaded_config['logging'] = c
+
     try:
         uwsgi_option_dict = loaded_config['uwsgi_options']
     except KeyError:
@@ -224,6 +261,12 @@ def start_server(daemon, config):
         os.makedirs(path['log'])
     if not os.access(os.path.join(path['log'], "uwsgi"), os.F_OK):
         os.makedirs(os.path.join(path['log'], "uwsgi"))
+
+    if not os.access(os.path.join(path['log'], "nginx"), os.F_OK):
+        os.makedirs(os.path.join(path['log'], "nginx"))
+
+    if not os.access(os.path.join(path['log'], "blackpearl"), os.F_OK):
+        os.makedirs(os.path.join(path['log'], "blackpearl"))
 
     # open(os.path.join(os.path.join(config.run, 'uwsgi'), "worker_reload.file"), "w").close()
     print("\nStarting BlackPearl server ...")
@@ -389,8 +432,8 @@ if __name__ == "__main__":
         print("ERROR: Exiting ...")
         sys.exit(1)
     except:
-        logger.critical("Unexpected error occurred.")
-        logger.critical("%s" % traceback.format_exc())
+        print("SEVERE: Unexpected error occurred.")
+        print("SEVERE: %s" % traceback.format_exc())
         sys.exit(1)
     else:
         try:
@@ -407,9 +450,9 @@ if __name__ == "__main__":
             else:
                 configuration = load(config_path)
         except Exception as e:
-            logger.critical("%s" % str(e))
+            print("SEVERE: %s" % str(e))
             print("SEVERE:", traceback.format_exc())
-            logger.critical("Error occurred. Stopping the blackpearl server.")
+            print("SEVERE: Error occurred. Stopping the blackpearl server.")
             sys.exit(1)
 
         sys.path.append(configuration['path']['lib'])
@@ -432,5 +475,5 @@ if __name__ == "__main__":
                 from BlackPearl.tools.newapp import invoke
                 invoke(**args_copy)
             except:
-                logger.critical("Error occurred while creating new webapp.")
+                print("SEVERE: Error occurred while creating new webapp.")
                 print("SEVERE:", traceback.format_exc())

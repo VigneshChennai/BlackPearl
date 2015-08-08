@@ -23,14 +23,14 @@ import multiprocessing
 import pickle
 import virtualenv
 import shutil
-
-from enum import Enum
-
 import os
 import functools
 import pyinotify
 import logging
 import logging.handlers
+
+from datetime import datetime
+from enum import Enum
 
 from BlackPearl.server.core import process
 from BlackPearl.server.core.process import Process, ProcessGroup, AsyncTask, ProcessStatus
@@ -40,19 +40,15 @@ from BlackPearl.core import webapps as webapps
 
 
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
 ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
 logger.addHandler(ch)
 
 formatter = logging.Formatter('[%(asctime)s][%(module)s][%(funcName)s][Line: %(levelno)s][%(levelname)s]: %(message)s')
 ch.setFormatter(formatter)
 
 
-
 @asyncio.coroutine
-def analyse_and_pickle_webapps(pypath, virtenv_folder, pickle_folder, *app_dirs):
+def analyse_and_pickle_webapps(config, pypath, virtenv_folder, pickle_folder, *app_dirs):
     # Will be used to hold the list of webapp analysis result
     logger.info("Analysing deployed webapps ....")
 
@@ -78,21 +74,28 @@ def analyse_and_pickle_webapps(pypath, virtenv_folder, pickle_folder, *app_dirs)
             command = [os.path.join(webapp_virtenv, "bin/python"),
                        os.path.join(os.path.dirname(__file__), 'analyzer.py'), webapps_minimal_file,
                        pickle_folder, app_dir, webapp_folder]
-            p = Process("Process: Webapp <%s> initializer" % app_dir, command, env={
-                "PYTHONPATH": ":".join(
-                    [pypath,
-                     os.path.join(app_dir, webapp_folder, "src", "api"),
-                     os.path.join(app_dir, webapp_folder, "lib"),
-                     os.path.join(app_dir, webapp_folder, 'test')]
-                )
-            })
 
-            yield from p.start()
-            yield from p.wait_for_completion()
-            if p.status == process.Status.STOPPED:
-                logger.info("Webapp<%s> analyse completed successfully." % app_dir)
-            else:
-                logger.error(" Webapp<%s> analyse failed." % app_dir)
+            # TODO: The analyse output also goes to server.out. Need to check that how it is happening
+            with open(os.path.join(config['path']['log'], "blackpearl", "%s_analysis.out" % webapp_folder), "w") as out:
+                p = Process("Process: Webapp <%s> initializer" % app_dir, command, env={
+                    "PYTHONPATH": ":".join(
+                        [pypath,
+                         os.path.join(app_dir, webapp_folder, "src", "api"),
+                         os.path.join(app_dir, webapp_folder, "lib"),
+                         os.path.join(app_dir, webapp_folder, 'test')]
+                    )
+                }, stdout=out, stderr=out)
+                yield from p.start()
+                yield from p.wait_for_completion()
+
+            with open(os.path.join(config['path']['log'], "blackpearl", "%s_analysis.out" % webapp_folder),
+                      encoding="UTF-8") as r:
+                if p.status == process.Status.STOPPED:
+                    logger.info("Webapp<%s> analyse completed successfully." % app_dir)
+                    logger.info("Analyse result: %s", r.read())
+                else:
+                    logger.error(" Webapp<%s> analyse failed." % app_dir)
+                    logger.error("Analyse result: %s", r.read())
 
         logger.info("Webapps deployed at <%s> initialized" % app_dir)
 
@@ -135,7 +138,7 @@ class Uwsgi(ProcessGroup):
     ]
 
     def __init__(self, uwsgi_loc, uwsgi_file, webapps_list, logs_dir, run_loc,
-                 security_key, security_block_size, nginx_bind, pypath, uwsgi_options):
+                 security_key, security_block_size, nginx_bind, pypath, uwsgi_options, max_log_size, max_log_files):
 
         super().__init__(name="uWsgi Service")
         self.run_loc = run_loc
@@ -152,6 +155,9 @@ class Uwsgi(ProcessGroup):
         self._add_apps(webapps_list)
         self.webapps_list = webapps_list
 
+        self.max_log_size = max_log_size
+        self.max_log_files = max_log_files
+
     @asyncio.coroutine
     def add_apps(self, webapps_list):
         deployed_apps_id = [w.id for w in self.webapps_list]
@@ -162,7 +168,7 @@ class Uwsgi(ProcessGroup):
         apps_to_stop = [webapp for webapp in self.webapps_list if webapp.id not in new_apps_id]
         for webapp in apps_to_stop:
             logger.debug("Stopping uWsgi Service for <", webapp.name, "(", webapp.url_prefix,
-                  ") > webapp as it is removed or it has error after recent code change")
+                         ") > webapp as it is removed or it has error after recent code change")
             yield from self.remove_process("'%s' uWsgi Service" % webapp.id)
 
         self.webapps_list = webapps_list
@@ -206,8 +212,9 @@ class Uwsgi(ProcessGroup):
                       "logto": '%s/uwsgi/%s.log' % (self.logs_dir, webapp.id),
                       "pidfile": '%s/uwsgi/%s.pid' % (self.run_loc, webapp.id), "buffer-size": '32768',
                       "touch-workers-reload": '%s/uwsgi/%s.reload' % (self.run_loc, webapp.id),
-                      "workers": str(multiprocessing.cpu_count()), "lazy-apps": 'true', "log-maxsize": "10485760",
-                      'home': webapp.python_home_path, 'log-maxsize': (5 * 1024 * 1024)}
+                      "workers": str(multiprocessing.cpu_count()), "lazy-apps": 'true',
+                      'home': webapp.python_home_path,
+                      "touch-logreopen": '%s/uwsgi/%s.log_reopen' % (self.run_loc, webapp.id)}
 
             config.update(opt)
             conf_list = [str(key) + " = " + str(value) for key, value in config.items()]
@@ -219,16 +226,38 @@ class Uwsgi(ProcessGroup):
     def reload_conf(self):
         self.send_signal(signal.SIGHUP)
 
+    def check_and_rotate_log(self):
+        for webapp in self.webapps_list:
+            log = '%s/uwsgi/%s.log' % (self.logs_dir, webapp.id)
+
+            rotated = False
+            if os.stat(log).st_size > self.max_log_size:
+                rotated = True
+                if os.access("%s.%s" % (log, self.max_log_files), os.F_OK):
+                    os.remove("%s.%s" % (log, self.max_log_files))
+                for i in range(self.max_log_files - 1, 0, -1):
+                    if os.access("%s.%s" % (log, i), os.F_OK):
+                        shutil.move("%s.%s" % (log, i), "%s.%s" % (log, i + 1))
+
+                shutil.move(log, "%s.1" % log)
+
+            if rotated:
+                with open('%s/uwsgi/%s.log_reopen' % (self.run_loc, webapp.id), "w") as w:
+                    w.write(datetime.now().isoformat())
+
 
 class Nginx(Process):
     def __init__(self, nginx_loc, hostname, listen,
-                 run_loc, share_loc, logs_loc):
+                 run_loc, share_loc, logs_loc, max_log_size, max_log_files):
         self.nginx_loc = nginx_loc
         self.hostname = hostname
         self.listen = listen
         self.run_loc = run_loc
         self.share_loc = share_loc
         self.logs_loc = logs_loc
+
+        self.max_log_size = max_log_size
+        self.max_log_files = max_log_files
 
         command = [self.nginx_loc, '-c', '{run}/nginx/nginx.conf'.format(run=self.run_loc)]
 
@@ -254,38 +283,38 @@ class Nginx(Process):
             location = Location()
             if len(webapp.url_prefix) > 1:
                 location.path = '^%s/?$' % webapp.url_prefix
-                location.add_value('alias', '%s/src/static/' % (webapp.location))
+                location.add_value('alias', '%s/src/static/' % webapp.location)
                 location.add_value('try_files', 'index.html', '%s/index' % webapp.url_prefix)
                 locations.append(location)
                 location = Location()
                 location.path = '(^%s/(.+))/$' % webapp.url_prefix
-                location.add_value('alias', '%s/src/static/$2/' % (webapp.location))
+                location.add_value('alias', '%s/src/static/$2/' % webapp.location)
                 location.add_value('try_files', 'index.html', '$1/index')
                 locations.append(location)
 
                 location = Location()
                 location.path = '^%s/(.+\.[^/]+$)' % webapp.url_prefix
-                location.add_value('alias', '%s/src/static/$1' % (webapp.location))
+                location.add_value('alias', '%s/src/static/$1' % webapp.location)
                 locations.append(location)
             else:
                 location.path = '^/?$'
-                location.add_value('alias', '%s/src/static/' % (webapp.location))
+                location.add_value('alias', '%s/src/static/' % webapp.location)
                 location.add_value('try_files', 'index.html', '/index')
                 locations.append(location)
                 location = Location()
                 location.path = '(^/(.+))/$'
-                location.add_value('alias', '%s/src/static/$2/' % (webapp.location))
+                location.add_value('alias', '%s/src/static/$2/' % webapp.location)
                 location.add_value('try_files', 'index.html', '$1/index')
                 locations.append(location)
 
                 location = Location()
                 location.path = '^/(.+\.[^/]+$)'
-                location.add_value('alias', '%s/src/static/$1' % (webapp.location))
+                location.add_value('alias', '%s/src/static/$1' % webapp.location)
                 locations.append(location)
 
         conf = "\n pid  %s/nginx/nginx.pid;" % self.run_loc
         conf += "\n daemon off;"
-        conf += "\n error_log %s/nginx.error.log  warn;" % self.logs_loc
+        conf += "\n error_log %s/nginx/nginx.error.log  warn;" % self.logs_loc
         conf += "\n worker_processes %s;" % str(multiprocessing.cpu_count())
         conf += "\n\n events {"
         conf += "\n\t worker_connections  1024;"
@@ -309,7 +338,7 @@ class Nginx(Process):
         conf += "\n\n\t server {"
         conf += "\n\t\t listen %s;" % self.listen
         conf += "\n\t\t server_name %s;" % self.hostname
-        conf += "\n\t\t access_log %s/nginx.access.log  main;" % self.logs_loc
+        conf += "\n\t\t access_log %s/nginx/nginx.access.log  main;" % self.logs_loc
 
         for loc in locations:
             conf += "\n\n\t\t location ~ %s {" % loc.path
@@ -335,17 +364,29 @@ class Nginx(Process):
             f.write(conf)
 
     def check_and_rotate_log(self):
-        access_log = "%s/nginx.access.log" % self.logs_loc
-        error_log = "%s/nginx.error.log" % self.logs_loc
+        access_log = "%s/nginx/nginx.access.log" % self.logs_loc
+        error_log = "%s/nginx/nginx.error.log" % self.logs_loc
 
         rotated = False
-        if os.stat(access_log).st_size > (5 * 1024 * 1024):
+        if os.stat(access_log).st_size > self.max_log_size:
             rotated = True
-            shutil.move(access_log, "%s.0" % access_log)
+            if os.access("%s.%s" % (access_log, self.max_log_files), os.F_OK):
+                os.remove("%s.%s" % (access_log, self.max_log_files))
+            for i in range(self.max_log_files - 1, 0, -1):
+                if os.access("%s.%s" % (access_log, i), os.F_OK):
+                    shutil.move("%s.%s" % (access_log, i), "%s.%s" % (access_log, i + 1))
 
-        if os.stat(error_log).st_size > (5 * 1024 * 1024):
+            shutil.move(access_log, "%s.1" % access_log)
+
+        if os.stat(error_log).st_size > self.max_log_size:
             rotated = True
-            shutil.move(error_log, "%s.0" % access_log)
+            if os.access("%s.%s" % (error_log, self.max_log_files), os.F_OK):
+                os.remove("%s.%s" % (error_log, self.max_log_files))
+            for i in range(self.max_log_files - 1, 0, -1):
+                if os.access("%s.%s" % (error_log, i), os.F_OK):
+                    shutil.move("%s.%s" % (error_log, i), "%s.%s" % (error_log, i + 1))
+
+            shutil.move(error_log, "%s.1" % error_log)
 
         if rotated:
             self.send_signal(signal.SIGUSR1)
@@ -362,6 +403,15 @@ class AppServer(AsyncTask, ProcessStatus):
         AsyncTask.__init__(self)
         ProcessStatus.__init__(self, process_name="BlackPearl Server")
         self.environment_initialized = False
+        self.config = None
+        self.reloading_code = False
+        self.reloading_conf = False
+        self.modified_files = []
+        self.webapp_locations = None
+        self.ev_loop = None
+
+        self.uwsgi = None
+        self.nginx = None
 
     @asyncio.coroutine
     def initialize_environment(self, config):
@@ -381,7 +431,7 @@ class AppServer(AsyncTask, ProcessStatus):
             webapp_locations = path['webapps']
             self.webapp_locations = webapp_locations
 
-            webapps_list = yield from analyse_and_pickle_webapps(path['lib'],
+            webapps_list = yield from analyse_and_pickle_webapps(self.config, path['lib'],
                                                                  os.path.join(config['path']['cache'], "virtenv"),
                                                                  "%s/uwsgi/pickle/" % path['run'],
                                                                  *webapp_locations
@@ -401,13 +451,14 @@ class AppServer(AsyncTask, ProcessStatus):
                 server['uwsgi'], path['lib'] + "/wsgi.py", webapps_list,
                 path['log'], path['run'], security['key'],
                 security['block_size'], listen,
-                path['lib'], uwsgi_options
+                path['lib'], uwsgi_options, config['logging']['max_log_size'], config['logging']['max_log_files']
             )
             self.uwsgi.generate_conf_file()
 
             self.nginx = Nginx(
                 server['nginx'], hostname, listen,
-                path['run'], path['share'], path['log']
+                path['run'], path['share'], path['log'], config['logging']['max_log_size'],
+                config['logging']['max_log_files']
             )
             self.nginx.generate_conf_file(webapps_list)
 
@@ -424,10 +475,10 @@ class AppServer(AsyncTask, ProcessStatus):
     def _init_log_rotation_manager(self):
         @asyncio.coroutine
         def monitor():
-            while self.__status__ not in (process.Status.STOPPED, process.Status.TERMINATED,
-                                          process.Status.STARTFAILED):
-                yield asyncio.sleep(30)
+            while self.__status__ not in (Status.STOPPED, Status.TERMINATED, Status.STARTFAILED):
+                yield from asyncio.sleep(5)
                 self.nginx.check_and_rotate_log()
+                self.uwsgi.check_and_rotate_log()
 
         self.new_async_task(monitor())
 
@@ -440,7 +491,7 @@ class AppServer(AsyncTask, ProcessStatus):
 
     def _signal_init(self):
         def signal_handler(signum):
-            print('Received signal : ', signum)
+            logger.info('Received signal : %s', signum)
             if signum in (signal.SIGTERM, signal.SIGINT, signal.SIGABRT):
                 logger.info("Stopping BlackPearl service")
                 self.new_async_task(self.stop())
@@ -551,8 +602,7 @@ class AppServer(AsyncTask, ProcessStatus):
 
                 self.afm.update_watch_path(rec=True)
                 if not webapps_list:
-                    logger.warn("Old code retained."
-                          " Modified code not redeployed.")
+                    logger.warn("Old code retained. Modified code not redeployed.")
                 else:
                     modified_webapps = []
                     for webapp in webapps_list:
@@ -638,7 +688,7 @@ class AppServer(AsyncTask, ProcessStatus):
                 self.new_async_task(self.reload_code())
 
 
-def daemonize(log_folder, wd="/", umask=0):
+def daemonize(log_level, max_log_size, max_log_files, log_folder, wd="/", umask=0):
     try:
         f = os.fork()
     except OSError as e:
@@ -667,21 +717,26 @@ def daemonize(log_folder, wd="/", umask=0):
 
         logger.info("Started as Daemon")
 
-        ch = logging.handlers.RotatingFileHandler(os.path.join(log_folder, "server.log"), mode='a',
-                                                  maxBytes=(10 * 1024 * 1024), backupCount=5, encoding="UTF-8", delay=0)
-        ch.setLevel(logging.INFO)
-        logger.addHandler(ch)
+        _ch = logging.handlers.RotatingFileHandler(os.path.join(log_folder, "blackpearl", "server.log"), mode='a',
+                                                  maxBytes=max_log_size, backupCount=max_log_files,
+                                                  encoding="UTF-8", delay=0)
+        ch.setLevel(log_level)
+        logger.addHandler(_ch)
 
         r = open("/dev/null", "r")
         os.dup2(r.fileno(), 0)
         buffering = 1  # line buffering
-        w = open(os.path.join(log_folder, "server.out"), "w", buffering=buffering)
+        w = open(os.path.join(log_folder, "blackpearl", "server.out"), "w", buffering=buffering)
         os.dup2(w.fileno(), 1)
         os.dup2(w.fileno(), 2)
 
 
 def start(config, daemon=False):
     print("Performing prechecks .... ", end="")
+
+    ch.setLevel(config['logging']['level'])
+    logger.setLevel(config['logging']['level'])
+
     path = config['path']
     try:
         prechecks.check_all()
@@ -695,7 +750,8 @@ def start(config, daemon=False):
         if daemon:
             logger.info("Starting BlackPearl in daemon mode ...")
             try:
-                daemonize(log_folder=path['log'])
+                daemonize(config['logging']['level'], config['logging']['max_log_size'],
+                          config['logging']['max_log_files'], log_folder=path['log'])
             except OSError:
                 logger.error(traceback.format_exc())
                 logger.error("Unable to start the server in daemon mode. Exiting.")

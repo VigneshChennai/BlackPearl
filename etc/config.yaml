@@ -15,28 +15,32 @@
 
 
 path :
-    lib : lib
-    share : share
-    webapps :
-        - share/builtinapps
-        - share/webapps
-    run : run
-    log : var/log
-    cache : var/cache
+  lib : lib
+  share : share
+  webapps :
+      - share/builtinapps
+      - share/webapps
+  run : run
+  log : var/log
+  cache : var/cache
 
 server:
-    nginx : /usr/sbin/nginx
-    uwsgi : /usr/sbin/uwsgi
+  nginx : /usr/sbin/nginx
+  uwsgi : /usr/sbin/uwsgi
 
 hostname : 'localhost'
 
 listen : 127.0.0.1:8080
 
 security :
-    block_size : 16
-    auto_generate_key : true
+  block_size : 16
+  auto_generate_key : true
+
+logging:
+  level: "INFO"
+  max_log_size: 5242880
+  max_log_files: 10
 
 uwsgi_options :
-    plugins : python
-    log-truncate : true
+  plugins : python
 

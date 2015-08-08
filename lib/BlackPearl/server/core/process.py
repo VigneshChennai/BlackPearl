@@ -123,13 +123,21 @@ class ProcessStatus:
 
 class Process(ProcessStatus, AsyncTask):
 
-    def __init__(self, name, command, env=None):
+    def __init__(self, name, command, env=None, stdin=None, stdout=sys.stdout, stderr=sys.stderr):
         ProcessStatus.__init__(self, process_name=name)
         AsyncTask.__init__(self)
         self.name = name
         self.command = command
         self.process = None
         self.process_stop_event = asyncio.Event()
+
+        self.stdout = stdout
+        self.stderr = stderr
+        if stdin:
+            self.stdin = stdin
+        else:
+            self.stdin = open("/dev/null")
+
         if env:
             self.env = env
         else:
@@ -174,12 +182,13 @@ class Process(ProcessStatus, AsyncTask):
         try:
             add_process(self)
             self.__set_status__(Status.STARTING)
-            null_device = open("/dev/null", "r")
+
+            null_device = self.stdin
 
             self.process_stop_event.clear()
             self.process = yield from asyncio.create_subprocess_exec(
                 *self.command, stdin=null_device,
-                stdout=sys.stdout, stderr=sys.stderr,
+                stdout=self.stdout, stderr=self.stderr,
                 env=self.env
             )
 

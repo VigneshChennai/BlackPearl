@@ -14,29 +14,33 @@
 # along with BlackPearl.  If not, see <http://www.gnu.org/licenses/>.
 
 
-path :
-    lib : /usr/lib/blackpearl
-    share : /usr/share/blackpearl
-    webapps :
-        - /usr/share/blackpearl/builtinapps
-        - /usr/share/blackpearl/webapps
-    run : /run/blackpearl
-    log : /var/log/blackpearl
-    cache : /var/cache
+path:
+  lib: /usr/lib/blackpearl
+  share: /usr/share/blackpearl
+  webapps:
+    - /usr/share/blackpearl/builtinapps
+    - /usr/share/blackpearl/webapps
+  run: /run/blackpearl
+  log: /var/log/blackpearl
+  cache: /var/cache
 
 server:
-    nginx : /usr/sbin/nginx
-    uwsgi : /usr/sbin/uwsgi
+  nginx: /usr/sbin/nginx
+  uwsgi: /usr/sbin/uwsgi
 
-hostname : 'localhost'
+hostname: 'localhost'
 
-listen : 127.0.0.1:80
+listen: 127.0.0.1:80
 
-security :
-    block_size : 16
-    auto_generate_key : true
+security:
+  block_size: 16
+  auto_generate_key: true
 
-uwsgi_options :
-    plugins : python
-    log-truncate : true
+logging:
+  level: "INFO"
+  max_log_size: 5242880
+  max_log_files: 10
+
+uwsgi_options:
+  plugins: python
 
