@@ -44,6 +44,10 @@ author = """
     Written by Vigneshwaran P (https://github.com/VigneshChennai)
 """
 
+logger = logging.getLogger()
+ch = logging.StreamHandler()
+logger.addHandler(ch)
+
 __FILE_LOCATION__ = 'PORTABLE'
 
 # Hardcoded defaults
@@ -75,6 +79,7 @@ CONFIG = {
 
     "logging": {
         "level": "INFO",
+        "format": '[%(asctime)s][%(module)s][%(funcName)s][Line: %(levelno)s][%(levelname)s]: %(message)s',
         "max_log_size": 5 * 1024 * 1024,
         "max_log_files": 5
     },
@@ -213,7 +218,7 @@ def validate_and_update(loaded_config, cwd):
                          "It should be of format <ip/hostname>:<port>. eg: 127.0.0.1:80. "
                          "Valid characters: alphanumeric, . (dot) and - (hypen)" % loaded_config['listen'])
 
-    _logging = ["level", "max_log_size", "max_log_files"]
+    _logging = ["level", "max_log_size", "max_log_files", 'format']
     try:
         logging_dict = loaded_config['logging']
     except KeyError:
@@ -297,6 +302,10 @@ Actions:
 
 
 def start_server(daemon, config):
+    ch.setFormatter(logging.Formatter(config['logging']['format']))
+    ch.setLevel(config['logging']['level'])
+    logger.setLevel(config['logging']['level'])
+
     path = config['path']
     if os.access(path['run'], os.F_OK):
         try:
@@ -331,8 +340,8 @@ def start_server(daemon, config):
         os.makedirs(os.path.join(path['log'], "blackpearl"))
 
     # open(os.path.join(os.path.join(config.run, 'uwsgi'), "worker_reload.file"), "w").close()
-    print("\nStarting BlackPearl server ...")
-    print("Generating log files at %s" % path['log'])
+    logger.info("Starting BlackPearl server ...")
+    logger.info("Generating log files at %s" % path['log'])
     appserver.start(config, daemon)
 
 

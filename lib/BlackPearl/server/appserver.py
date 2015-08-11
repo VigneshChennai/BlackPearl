@@ -39,12 +39,9 @@ from BlackPearl.common import fileutils
 from BlackPearl.core import webapps as webapps
 
 
-logger = logging.getLogger()
-ch = logging.StreamHandler()
+logger = logging.getLogger(__name__)
+ch = logging.NullHandler()
 logger.addHandler(ch)
-
-formatter = logging.Formatter('[%(asctime)s][%(module)s][%(funcName)s][Line: %(levelno)s][%(levelname)s]: %(message)s')
-ch.setFormatter(formatter)
 
 
 @asyncio.coroutine
@@ -690,7 +687,7 @@ class AppServer(AsyncTask, ProcessStatus):
                 self.new_async_task(self.reload_code())
 
 
-def daemonize(log_level, max_log_size, max_log_files, log_folder, wd="/", umask=0):
+def daemonize(log_level, log_formatter, max_log_size, max_log_files, log_folder, wd="/", umask=0):
     try:
         f = os.fork()
     except OSError as e:
@@ -729,7 +726,7 @@ def daemonize(log_level, max_log_size, max_log_files, log_folder, wd="/", umask=
                                                    maxBytes=max_log_size, backupCount=max_log_files,
                                                    encoding="UTF-8", delay=0)
         ch.setLevel(log_level)
-
+        _ch.setFormatter(log_formatter)
         logger.addHandler(_ch)
 
         r = open("/dev/null", "r")
@@ -759,7 +756,7 @@ def start(config, daemon=False):
         if daemon:
             logger.info("Starting BlackPearl in daemon mode ...")
             try:
-                daemonize(config['logging']['level'], config['logging']['max_log_size'],
+                daemonize(config['logging']['level'], config['logging']['format'], config['logging']['max_log_size'],
                           config['logging']['max_log_files'], log_folder=path['log'])
             except OSError:
                 logger.error(traceback.format_exc())
