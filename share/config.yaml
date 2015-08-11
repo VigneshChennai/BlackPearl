@@ -33,7 +33,7 @@ hostname: 'localhost'
 listen: 127.0.0.1:80
 
 security:
-  block_size: 16
+  block_size: 256
   auto_generate_key: true
 
 logging:

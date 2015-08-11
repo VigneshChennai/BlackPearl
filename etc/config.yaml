@@ -33,12 +33,12 @@ hostname : 'localhost'
 listen : 127.0.0.1:8080
 
 security :
-  block_size : 16
+  block_size : 256
   auto_generate_key : true
 
 logging:
   level: "INFO"
-  max_log_size: 5242880
+  max_log_size: '5242880'
   max_log_files: 10
 
 uwsgi_options :

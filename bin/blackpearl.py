@@ -24,7 +24,9 @@ import signal
 import time
 import yaml
 import base64
+import binascii
 import logging
+import re
 
 startup_notes = """
     BlackPearl is free software. License GPLv3+: GNU GPL version 3 or later
@@ -67,7 +69,7 @@ CONFIG = {
     "listen": "127.0.0.1:80",
 
     "security": {
-        "block_size": 16,
+        "block_size": 256,
         "auto_generate_key": True
     },
 
@@ -78,8 +80,7 @@ CONFIG = {
     },
 
     "uwsgi_options": {
-        "plugins": "python",
-        "log-truncate": True
+        "plugins": "python"
     }
 }
 
@@ -116,6 +117,19 @@ def validate_and_update(loaded_config, cwd):
         c['webapps'] = t_list
         loaded_config['path'] = c
 
+    for name, path in loaded_config['path'].items():
+        if type(path) != str:
+            for p in path:
+                if not os.access(p, os.F_OK) or not os.path.isdir(p):
+                    raise ValueError(
+                        "The directory <%s> not found/invalid directory. Make sure you have"
+                        " specified correct path for <%s> in configuration file." % (p, name))
+        else:
+            if not os.access(path, os.F_OK) or not os.path.isdir(path):
+                raise ValueError(
+                    "The directory <%s> not found/invalid directory. Make sure you have"
+                    " specified correct path for <%s> in configuration file." % (path, name))
+
     server = ["nginx", "uwsgi"]
     try:
         server_dict = loaded_config['server']
@@ -130,6 +144,16 @@ def validate_and_update(loaded_config, cwd):
         c.update(server_dict)
         loaded_config['server'] = c
 
+    for name, path in loaded_config['server'].items():
+        if not os.access(path, os.F_OK) or not os.path.isfile(path):
+            raise ValueError(
+                "The file <%s> not found/invalid file. Make sure you have"
+                " specified correct path for <%s> in configuration file." % (path, name))
+        if not os.access(path, os.X_OK):
+            raise ValueError(
+                "The file <%s> is not executable. Make sure you have"
+                " specified correct path for <%s> in configuration file." % (path, name))
+
     security = ["block_size", "auto_generate_key", "key"]
     try:
         security_dict = loaded_config['security']
@@ -138,19 +162,41 @@ def validate_and_update(loaded_config, cwd):
     else:
         for key in security_dict.keys():
             if key not in security:
-                raise ValueError("Unknown value '<%s>' under category <security> in configuration file." % key)
+                raise ValueError(
+                    "Unknown value '<%s>' under category <security> in configuration file." % key) from None
 
         c = CONFIG['security'].copy()
         c.update(security_dict)
         loaded_config['security'] = c
 
         if c['auto_generate_key']:
+            try:
+                c['block_size'] = int(int(c['block_size'])/8)
+            except ValueError:
+                raise ValueError(
+                    "Security key block size should be an integer but <%s> found." % c['block_size']) from None
+
+            if c['block_size'] not in (16, 24, 32):
+                raise ValueError(
+                    "Security key block size should be 128, 192 or 256 but <%s> specified." % c['block_size'])
+
             c['key'] = base64.b64encode(os.urandom(c['block_size']))
+
         else:
             try:
                 c['key']
             except:
-                raise ValueError("Key is not defined under category <security> in configuration file.") from None
+                raise ValueError("<key> is not defined under category <security> in configuration file.") from None
+
+            try:
+                bin = base64.b64decode(loaded_config['security']['key'])
+            except binascii.Error:
+                raise ValueError("The security key should be base64 of x bytes, where x is the block size.") from None
+
+            if len(bin) not in (16, 24, 32):
+                raise ValueError(
+                    "The security key be base64 strings of 128, 192 or 256 bits key "
+                    "but it is of <%s> bits" % (len(bin) * 8))
 
     try:
         loaded_config['hostname']
@@ -161,6 +207,11 @@ def validate_and_update(loaded_config, cwd):
         loaded_config['listen']
     except KeyError:
         loaded_config['listen'] = CONFIG['listen']
+
+    if not re.match(r"^[a-zA-Z-.0-9]+:[0-9]+$", loaded_config['listen']):
+        raise ValueError("Invalid value for 'listen' <%s>. "
+                         "It should be of format <ip/hostname>:<port>. eg: 127.0.0.1:80. "
+                         "Valid characters: alphanumeric, . (dot) and - (hypen)" % loaded_config['listen'])
 
     _logging = ["level", "max_log_size", "max_log_files"]
     try:
@@ -184,13 +235,24 @@ def validate_and_update(loaded_config, cwd):
         try:
             level = log_level_dict[logging_dict["level"].upper()]
         except KeyError:
-            raise ValueError("Logging Level value should be one of '<%s>'" % log_level_dict.keys())
+            raise ValueError("Logging Level value should be one of '<%s>'" % list(log_level_dict.keys()))
         else:
             logging_dict['level'] = level
 
         c = CONFIG['logging'].copy()
         c.update(logging_dict)
         loaded_config['logging'] = c
+
+    try:
+        loaded_config['logging']['max_log_size'] = int(loaded_config['logging']['max_log_size'])
+    except ValueError:
+        raise ValueError("max_log_size should be an integer but found <%s>." % loaded_config['logging']['max_log_size'])
+
+    try:
+        loaded_config['logging']['max_log_files'] = int(loaded_config['logging']['max_log_files'])
+    except ValueError:
+        raise ValueError(
+            "max_log_files should be an integer but found <%s>." % loaded_config['logging']['max_log_files'])
 
     try:
         uwsgi_option_dict = loaded_config['uwsgi_options']
@@ -438,9 +500,8 @@ if __name__ == "__main__":
     else:
         try:
             print("INFO: Initializing BlackPearl Configuration.")
-            try:
-                config_path = p_args['-c']
-            except:
+            config_path = p_args.get('-c')
+            if not config_path:
                 if __FILE_LOCATION__ == "PORTABLE":
                     configuration = load(os.path.join(
                         os.path.dirname(os.path.dirname(os.path.realpath(__file__))), 'etc', 'config.yaml'),
