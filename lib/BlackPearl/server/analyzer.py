@@ -27,11 +27,10 @@ logger.setLevel(logging.INFO)
 
 ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
-logger.addHandler(ch)
 
 formatter = logging.Formatter('[%(asctime)s][%(module)s][%(funcName)s][Line: %(levelno)s][%(levelname)s]: %(message)s')
 ch.setFormatter(formatter)
-
+logger.addHandler(ch)
 
 for package in ('PyYaml', 'pycrypto', 'requests'):
     if pip.main(['install', package]) == 1:

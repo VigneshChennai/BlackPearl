@@ -323,7 +323,7 @@ class ProcessGroup(AsyncTask, ProcessStatus):
         self.processes = {}
         self.status_listener_cb = None
 
-    def add_process(self, name, command, env=None):
+    def add_process(self, name, command, env=None, stdin=None, stdout=sys.stdout, stderr=sys.stderr):
         if name in self.processes:
             raise ValueError("The process with name <%s> is already added to the ProcessGroup<%s>" % (name, self.name))
 
@@ -355,7 +355,7 @@ class ProcessGroup(AsyncTask, ProcessStatus):
                     self.__set_status__(Status.STARTED)
             # elif status == Status.STOPPED:
 
-        process = Process(name, command, env)
+        process = Process(name, command, env, stdin, stdout, stderr)
         process.add_status_listener(set_process_status)
         self.processes[name] = {
             "process": process,

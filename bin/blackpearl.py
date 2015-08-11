@@ -301,7 +301,7 @@ def stop_server(config):
                         print(".", end="")
                         sys.stdout.flush()
                         os.kill(int(pid), 0)
-                        time.sleep(1)
+                        time.sleep(2)
                         count += 1
                     print("[Failed]")
                 except:

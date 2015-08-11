@@ -75,7 +75,6 @@ def analyse_and_pickle_webapps(config, pypath, virtenv_folder, pickle_folder, *a
                        os.path.join(os.path.dirname(__file__), 'analyzer.py'), webapps_minimal_file,
                        pickle_folder, app_dir, webapp_folder]
 
-            # TODO: The analyse output also goes to server.out. Need to check that how it is happening
             with open(os.path.join(config['path']['log'], "blackpearl", "%s_analysis.out" % webapp_folder), "w") as out:
                 p = Process("Process: Webapp <%s> initializer" % app_dir, command, env={
                     "PYTHONPATH": ":".join(
@@ -180,6 +179,7 @@ class Uwsgi(ProcessGroup):
         for webapp in apps_to_start:
             logger.debug("Starting uWsgi Service for <", webapp.name, "(", webapp.url_prefix, ") > webapp")
             command = [self.uwsgi_loc, '--ini', "%s/uwsgi/%s.conf" % (self.run_loc, webapp.id)]
+            out_file = open('%s/uwsgi/%s.out' % (self.logs_dir, webapp.id), "w")
             self.add_process(
                 name="'%s' uWsgi Service" % webapp.id, command=command,
                 env={
@@ -194,7 +194,9 @@ class Uwsgi(ProcessGroup):
                          os.path.join(webapp.location, "lib"),
                          os.path.join(webapp.location, 'test')]
                     )
-                }
+                },
+                stdout=out_file,
+                stderr=out_file
             )
 
     def generate_conf_file(self):
@@ -476,7 +478,7 @@ class AppServer(AsyncTask, ProcessStatus):
         @asyncio.coroutine
         def monitor():
             while self.__status__ not in (Status.STOPPED, Status.TERMINATED, Status.STARTFAILED):
-                yield from asyncio.sleep(5)
+                yield from asyncio.sleep(15)
                 self.nginx.check_and_rotate_log()
                 self.uwsgi.check_and_rotate_log()
 
@@ -700,7 +702,8 @@ def daemonize(log_level, max_log_size, max_log_files, log_folder, wd="/", umask=
     if f != 0:
         sys.exit(0)
     else:
-        signal.signal(signal.SIGHUP, lambda x, y: logger.info("SIGHUP received during process forking, ignoring signal"))
+        signal.signal(signal.SIGHUP,
+                      lambda x, y: logger.info("SIGHUP received during process forking, ignoring signal"))
         os.chdir(wd)
         os.setsid()
         os.umask(umask)
@@ -717,10 +720,16 @@ def daemonize(log_level, max_log_size, max_log_files, log_folder, wd="/", umask=
 
         logger.info("Started as Daemon")
 
+        # Removing any previously set handlers
+        handlers = [handler for handler in logger.handlers]
+        for h in handlers:
+            logger.removeHandler(h)
+
         _ch = logging.handlers.RotatingFileHandler(os.path.join(log_folder, "blackpearl", "server.log"), mode='a',
-                                                  maxBytes=max_log_size, backupCount=max_log_files,
-                                                  encoding="UTF-8", delay=0)
+                                                   maxBytes=max_log_size, backupCount=max_log_files,
+                                                   encoding="UTF-8", delay=0)
         ch.setLevel(log_level)
+
         logger.addHandler(_ch)
 
         r = open("/dev/null", "r")
@@ -732,21 +741,21 @@ def daemonize(log_level, max_log_size, max_log_files, log_folder, wd="/", umask=
 
 
 def start(config, daemon=False):
-    print("Performing prechecks .... ", end="")
-
     ch.setLevel(config['logging']['level'])
     logger.setLevel(config['logging']['level'])
+
+    logger.info("Performing prechecks .... ")
 
     path = config['path']
     try:
         prechecks.check_all()
     except Exception as e:
-        print("[Failed]")
+        logger.critical("Prechecks .... [Failed]")
         logger.critical("%s" % str(e))
         logger.info("BlackPearl server not started ....")
         sys.exit(-1)
     else:
-        print("[Ok]")
+        logger.info("Prechecks .... [Ok]")
         if daemon:
             logger.info("Starting BlackPearl in daemon mode ...")
             try:
@@ -782,7 +791,8 @@ def start(config, daemon=False):
             finally:
                 ev_loop.close()
         else:
-            logger.error(" BlackPearl services not started due to the issue occurred during environment initialization.")
+            logger.error(" BlackPearl services not started due to the issue occurred during "
+                         "environment initialization.")
             ev_loop.close()
 
 
