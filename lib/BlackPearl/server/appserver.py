@@ -70,8 +70,8 @@ def analyse_and_pickle_webapps(config, pypath, virtenv_folder, pickle_folder, *a
 
             command = [os.path.join(webapp_virtenv, "bin/python"),
                        os.path.join(os.path.dirname(__file__), 'analyzer.py'), webapps_minimal_file,
-                       pickle_folder, app_dir, webapp_folder]
-
+                       pickle_folder, app_dir, webapp_folder, str(config['logging']['level']),
+                       config['logging']['format']]
             with open(os.path.join(config['path']['log'], "blackpearl", "%s_analysis.out" % webapp_folder), "w") as out:
                 p = Process("Process: Webapp <%s> initializer" % app_dir, command, env={
                     "PYTHONPATH": ":".join(

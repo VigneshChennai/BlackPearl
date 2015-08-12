@@ -22,29 +22,28 @@ import traceback
 import pip
 import logging
 
+from pip import basecommand
+
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
 
-ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
 
-formatter = logging.Formatter('[%(asctime)s][%(module)s][%(funcName)s][Line: %(levelno)s][%(levelname)s]: %(message)s')
-ch.setFormatter(formatter)
-logger.addHandler(ch)
-
-for package in ('PyYaml', 'pycrypto', 'requests'):
-    if pip.main(['install', package]) == 1:
-        logger.error("Failed to install package<%s> in the new virtualenv." % package)
+def _upgrade_pip():
+    if pip.main(['install', "--upgrade", "pip"]) == 1:
+        logger.error("Failed to upgrade pip in the virtualenv.")
         sys.exit(1)
 
-logger.info("Packages installed successfully.")
 
-from BlackPearl.core.webapps import WebAppMinimal
-from BlackPearl.core import webapps as webapps
+def _install():
+    for package in ('PyYaml', 'pycrypto', 'requests'):
+        if pip.main(['install', package]) == 1:
+            logger.error("Failed to install package<%s> in the new virtualenv." % package)
+            sys.exit(1)
 
 
 # Analyses the single webapp folder
 def analyser(webapps_pickle_minimal, pickle_folder, location, folder):
+    from BlackPearl.core.webapps import WebAppMinimal
+    from BlackPearl.core import webapps as webapps
 
     if not os.access(webapps_pickle_minimal, os.F_OK):
         webapps_minimal = []
@@ -83,6 +82,26 @@ def main():
     pickle_folder = sys.argv[2]
     webapps_location = sys.argv[3]
     webapp_folder = sys.argv[4]
+
+    log_level = int(sys.argv[5])
+    log_format = sys.argv[6]
+
+    logger.setLevel(log_level)
+    ch = logging.StreamHandler()
+    ch.setLevel(log_level)
+    ch.setFormatter(logging.Formatter(log_format))
+    logger.addHandler(ch)
+
+    logger.info("Going to install basic required packages by blackpearl.")
+
+    # pip is removing our log handler and initializing their own handlers.
+    # I am just stopping their logger initialization using below code. It is the worst way to do it but it works.
+    # TODO: Need to find a cleaner way
+    basecommand.logging_dictConfig = lambda *args, **kwargs: None
+    _upgrade_pip()
+    _install()
+
+    logger.info("Packages installed successfully.")
 
     analyser(webapps_pickle_minimal, pickle_folder, webapps_location, webapp_folder)
 
