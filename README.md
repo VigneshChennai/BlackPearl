@@ -1,4 +1,4 @@
-# BlackPearl
+# BlackPearl Mullai
 Highly scalable python wsgi application server built on top of uwsgi and nginx.
 The main aim is to build an enterprise grade application server for python
 webapplications by providing both the Webapplication framework and Server
